@@ -16,8 +16,8 @@ license = ["SPDX:GPL-3.0-or-later"]
 copyright = ["2026 Lojith and CSK360 contributors"]
 
 [permissions]
-files = "Read dialogue audio and write generated voices to the voice folder"
-network = "Download offline voice models and Rhubarb lip sync when you press Install Voices"
+files = "Read dialogue audio and save generated voices"
+network = "Download voice models and Rhubarb when you install voices"
 
 [build]
 paths_exclude_pattern = ["__pycache__/", "*.pyc", "/.git/"]
