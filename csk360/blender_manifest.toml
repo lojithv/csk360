@@ -9,8 +9,8 @@ type = "add-on"
 
 tags = ["Animation", "Rigging", "Sequencer"]
 
-# Written against the 4.4+ slotted-action API; tested on Blender 5.3.
-blender_version_min = "4.5.0"
+# Supported and tested on Blender 5.3 only for now; older versions later.
+blender_version_min = "5.3.0"
 
 license = ["SPDX:GPL-3.0-or-later"]
 copyright = ["2026 Lojith and CSK360 contributors"]

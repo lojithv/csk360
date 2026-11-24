@@ -81,6 +81,7 @@ class CSK360_PT_cast(_Panel, bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         proj = context.scene.csk360
+        layout.operator("csk360.add_starter_character", icon="OUTLINER_OB_ARMATURE")
         row = layout.row()
         row.template_list("CSK360_UL_cast", "", proj, "cast", proj, "active_cast_index", rows=3)
         col = row.column(align=True)

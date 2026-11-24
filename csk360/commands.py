@@ -156,6 +156,13 @@ def add_cast(scene, obj, name=None, rig_type=None, voice=""):
     return cid
 
 
+def add_starter_character(scene, name="Leo", location=(0.0, 0.0, 0.0), voice=""):
+    """Build the starter 3D toon character, add the starter library and cast it."""
+    from . import starter
+    rig = starter.create_character(scene, name=name, location=location)
+    return add_cast(scene, rig, name=name, rig_type="biped3d", voice=voice)
+
+
 def set_home(scene, cast_id):
     """Use the character's current position as its start position."""
     c = get_cast(scene, cast_id)

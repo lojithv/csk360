@@ -5,7 +5,7 @@ CSK360, and for scripts that **use** it inside Blender.
 
 ## Working on the code
 
-* Blender 5.3 is the development target; keep code on the 4.4+ slotted-action
+* Blender 5.3 is the only supported version for now; keep code on the slotted-action
   API (`action.slots`, `layers`, `channelbags`). There is no `action.fcurves`.
 * Run `./tools/test.ps1` (headless, ~2 s) after every change; add a test for
   every behaviour change. Tests live in `tests/test_*.py` and use fixtures in

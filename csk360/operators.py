@@ -63,6 +63,26 @@ class CSK360_OT_add_cast(_CSKOperator, bpy.types.Operator):
         commands.add_cast(context.scene, context.active_object, name=self.name or None)
 
 
+class CSK360_OT_add_starter_character(_CSKOperator, bpy.types.Operator):
+    """Add a ready-rigged 3D toon character at the 3D cursor, with starter poses and actions"""
+    bl_idname = "csk360.add_starter_character"
+    bl_label = "Add Starter Character"
+
+    name: StringProperty(name="Name", default="Leo")
+
+    @classmethod
+    def poll(cls, context):
+        return context.mode == "OBJECT"
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def run(self, context):
+        scene = context.scene
+        commands.add_starter_character(scene, name=self.name or "Character",
+                                       location=tuple(scene.cursor.location))
+
+
 class CSK360_OT_remove_cast(_CSKOperator, bpy.types.Operator):
     """Remove the selected cast member with all its clips, moves and lines"""
     bl_idname = "csk360.remove_cast"
@@ -296,6 +316,7 @@ class CSK360_OT_mark_asset(_CSKOperator, bpy.types.Operator):
 
 classes = (
     CSK360_OT_add_cast,
+    CSK360_OT_add_starter_character,
     CSK360_OT_remove_cast,
     CSK360_OT_set_home,
     CSK360_OT_add_clip,

@@ -17,7 +17,8 @@ cartoons, and at AI agents that build the same scenes from a script.
 
 | Feature | How |
 | --- | --- |
-| Cast | Select a character object, **CSK360 tab → Cast → +** |
+| Starter character | **CSK360 tab → Add Starter Character**: a code-built 3D toon (`biped_toon` bones, mouth shape keys driven by the `mouth` control) plus starter actions `idle`, `walk`, `wave`, `arms_crossed`, `sit` |
+| Cast | Or use your own rig: select it, **CSK360 tab → Cast → +** |
 | Pose and action clips | Clips on Body / Gesture / Face layers, at the playhead, with default length from the library |
 | Clip length | `]` / `[` ±1 second, `Shift` ±1 frame (Object Mode), or the −1 s / +1 s buttons |
 | Clip modes | **Loop** repeats to fill, **Once** plays then holds the last pose, **Pose** holds a still |
@@ -26,12 +27,18 @@ cartoons, and at AI agents that build the same scenes from a script.
 | Dialogue lines | Audio file → sound strip; mouth shapes (Rhubarb A–H, X) keyed on the rig's `mouth` property; moving a line moves voice and lips together |
 | Manual layer | Your own keys in the object's active action and your own NLA tracks are never touched |
 
+![Starter character: walk, sit, wave, arms crossed, mouth shape D](docs/starter_preview.png)
+
+The starter character is a placeholder made of simple shapes so the workflow
+can be built and tested before real art exists. Regenerate this sheet with
+`blender -b --factory-startup -P tools/preview_starter.py -- docs/starter_preview.png`.
+
 Everything the panels do is also a Python call in `csk360.commands`, so scripts
 and agents get identical results (see [AGENTS.md](AGENTS.md)).
 
 ## Requirements
 
-* Blender **4.5 or newer** (uses the slotted-action API). Developed and tested on **Blender 5.3**.
+* Blender **5.3**. Older versions (e.g. 4.5 LTS) may be supported later.
 
 ## Install
 

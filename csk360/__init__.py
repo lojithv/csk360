@@ -4,7 +4,7 @@
 Scripts and agents should use `commands` (see AGENTS.md in the repository).
 """
 
-from . import commands, compiler, keymaps, library, model, operators, ui
+from . import commands, compiler, keymaps, library, model, operators, starter, ui
 
 _modules = (model, operators, ui, keymaps)
 
