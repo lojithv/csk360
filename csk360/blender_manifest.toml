@@ -1,0 +1,22 @@
+schema_version = "1.0.0"
+
+id = "csk360"
+version = "0.1.0"
+name = "CSK360 Creator Shortcuts Kit"
+tagline = "Animate characters with clips, moves and dialogue, not keyframes"
+maintainer = "Lojith"
+type = "add-on"
+
+tags = ["Animation", "Rigging", "Sequencer"]
+
+# Written against the 4.4+ slotted-action API; tested on Blender 5.3.
+blender_version_min = "4.5.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+copyright = ["2026 Lojith and CSK360 contributors"]
+
+[permissions]
+files = "Read dialogue audio files from disk"
+
+[build]
+paths_exclude_pattern = ["__pycache__/", "*.pyc", "/.git/"]
