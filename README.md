@@ -25,6 +25,7 @@ cartoons, and at AI agents that build the same scenes from a script.
 | Layering | Gesture and Face clips use *Combine* blending over the Body layer; overlapping clips get extra tracks automatically |
 | Walk to a point or object | Straight-line walk, speed from the walk cycle's stride so feet don't slide; walks to an object's `*approach*` child empty; optional arrival action (e.g. sit) |
 | Dialogue lines | Audio file → sound strip; mouth shapes (Rhubarb A–H, X) keyed on the rig's `mouth` property; moving a line moves voice and lips together |
+| Voices | **Voices → Install Voices** once (about 900 MB, offline afterwards). Then type a line and press **Generate**: it is spoken with Kokoro or Supertonic 3, lip-synced with Rhubarb, and placed on the timeline. Only new or edited lines are regenerated |
 | Manual layer | Your own keys in the object's active action and your own NLA tracks are never touched |
 
 ![Starter character: walk, sit, wave, arms crossed, mouth shape D](docs/starter_preview.png)
@@ -49,6 +50,26 @@ and agents get identical results (see [AGENTS.md](AGENTS.md)).
 To use one of your own actions as a library item, assign it to an object and
 press **Library → Add Action to Library**, then set its kind (pose, action,
 transition), layer, loop, default duration and stride.
+
+## Voices and lip sync
+
+Speech runs in a separate background process with its own Python environment
+(created from Blender's own Python), so nothing heavy is loaded into Blender.
+Everything is stored in one folder shared by all Blender versions:
+`~/.csk360` (or set the `CSK360_HOME` environment variable).
+
+| Part | Used for | Licence |
+| --- | --- | --- |
+| [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) via [kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) | Default voices (`kokoro/af_heart`, `kokoro/am_michael`, …) | Apache-2.0 / MIT |
+| [Supertonic 3](https://huggingface.co/Supertone/supertonic-3) | Voices `supertonic/F1`…`M5`, 31 languages (`supertonic/M2@de`) | **BigScience OpenRAIL-M**: use restrictions; you must accept them in the Voices panel first, disclose generated speech as machine-generated and not impersonate real people |
+| [Rhubarb Lip Sync](https://github.com/DanielSWolf/rhubarb-lip-sync) 1.14 | Mouth shapes A–H, X from the audio and text | MIT |
+| ONNX Runtime, NumPy, phonemizer, espeak-ng | Running the models | MIT / BSD / GPL-3.0 |
+
+Generated audio is cached by text + voice + speed, so re-generating is instant.
+Rhubarb's English recogniser is used for English voices and its phonetic
+recogniser for other languages. Generated files currently live in the voice
+folder's `cache`, not next to the .blend, so copy them if you move the project
+to another computer.
 
 ## Development
 

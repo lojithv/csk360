@@ -23,7 +23,7 @@ class CSKError(Exception):
 
 CLIP_FIELDS = {"layer", "asset", "start", "duration", "loop_mode", "blend_in", "blend_out"}
 MOVE_FIELDS = {"start", "speed", "walk_asset", "arrival_asset"}
-LINE_FIELDS = {"text", "voice", "emotion", "start", "audio_path", "duration"}
+LINE_FIELDS = {"text", "voice", "emotion", "start", "audio_path", "duration", "follows"}
 
 
 # ---------------------------------------------------------------------------
@@ -91,12 +91,39 @@ def _report(scene, warnings):
     return warnings
 
 
+LINE_GAP = 0.2  # seconds between a line and the one that follows it
+
+
+def _reflow(scene):
+    """Place lines that follow another line right after it. Returns cast ids that moved."""
+    lines = {l.id: l for l in scene.csk360.lines}
+    moved = []
+    for _ in range(len(lines)):  # chains settle in at most len(lines) passes
+        changed = False
+        for line in lines.values():
+            prev = lines.get(line.follows)
+            if prev is None or prev is line:
+                continue
+            start = prev.start + prev.duration + LINE_GAP
+            if abs(line.start - start) > 1e-6:
+                line.start = start
+                moved.append(line.cast_id)
+                changed = True
+        if not changed:
+            break
+    return moved
+
+
 def _rebuild(scene, cast_ids=(), sounds=False):
     proj = scene.csk360
     warnings = []
     with batch(scene):
         if sounds:
             warnings += compiler.compile_dialogue(scene)
+            moved = _reflow(scene)
+            if moved:
+                warnings = compiler.compile_dialogue(scene)
+                cast_ids = list(cast_ids) + moved
         for cid in dict.fromkeys(cast_ids):
             for c in proj.cast:
                 if c.id == cid:
@@ -359,16 +386,25 @@ def lines_end(scene, cast_id=None):
 
 
 def add_line(scene, cast_id, text, start=None, after_previous=False, audio_path="",
-             visemes=None, voice="", emotion="neutral", duration=None):
-    """Add a dialogue line. `visemes` is [(seconds_from_line_start, 'A'..'H'|'X'), ...]."""
+             visemes=None, voice="", emotion="neutral", duration=None, generate=False):
+    """Add a dialogue line. `visemes` is [(seconds_from_line_start, 'A'..'H'|'X'), ...].
+
+    With generate=True the line is voiced and lip-synced right away (blocking)."""
     get_cast(scene, cast_id)
     proj = scene.csk360
+    follows = ""
     if start is None:
-        start = lines_end(scene) if after_previous else playhead(scene)
+        if after_previous and len(proj.lines):
+            last = max(proj.lines, key=lambda l: l.start + l.duration)
+            follows = last.id
+            start = last.start + last.duration + LINE_GAP
+        else:
+            start = playhead(scene)
     with batch(scene):
         line = proj.lines.add()
         line.id = _new_id(proj, "line")
         line.cast_id = cast_id
+        line.follows = follows
         line.text = text
         line.voice = voice
         line.emotion = emotion
@@ -383,6 +419,10 @@ def add_line(scene, cast_id, text, start=None, after_previous=False, audio_path=
         proj.active_line_index = len(proj.lines) - 1
         line_id = line.id
     _rebuild(scene, [cast_id], sounds=True)
+    if generate:
+        errors = generate_lines(scene, [line_id])
+        if errors:
+            raise CSKError("; ".join(errors))
     return line_id
 
 
@@ -411,6 +451,80 @@ def remove_line(scene, line_id):
         proj.lines.remove(index)
         _clamp_indices(proj)
     _rebuild(scene, [cast_id], sounds=True)
+
+
+# ---------------------------------------------------------------------------
+# Voices (text-to-speech + lip sync, run by the separate voice service)
+# ---------------------------------------------------------------------------
+
+def line_voice(scene, line):
+    """(voice id, speed) a line will be spoken with."""
+    from . import voice
+    cast = get_cast(scene, line.cast_id)
+    return (line.voice or cast.voice or voice.DEFAULT_VOICE), cast.speed
+
+
+def line_needs_voice(scene, line):
+    from . import voice
+    if not line.text.strip():
+        return False
+    v, speed = line_voice(scene, line)
+    _path, key = voice.cache_path(line.text, v, speed)
+    return line.audio_key != key or not line.audio_path
+
+
+def voice_jobs(scene, line_ids=None, force=False):
+    """Jobs for lines whose text, voice or speed changed since they were last voiced."""
+    from . import voice
+    jobs = []
+    for line in scene.csk360.lines:
+        if line_ids is not None and line.id not in line_ids:
+            continue
+        if not line.text.strip() or not (force or line_needs_voice(scene, line)):
+            continue
+        v, speed = line_voice(scene, line)
+        if "/" not in v:
+            raise CSKError(f"{line.id}: voice '{v}' should look like kokoro/af_heart or supertonic/M1.")
+        out, _key = voice.cache_path(line.text, v, speed)
+        jobs.append({"id": line.id, "text": line.text, "voice": v, "speed": speed, "out": out})
+    return jobs
+
+
+def apply_voice_results(scene, results):
+    """Store generated audio and mouth shapes on their lines. Returns error messages."""
+    import os
+    errors, casts = [], []
+    proj = scene.csk360
+    with batch(scene):
+        for line_id, r in results.items():
+            try:
+                line = get_line(scene, line_id)
+            except CSKError:
+                continue
+            if not r.get("ok"):
+                errors.append(f"{line_id}: {r.get('error', 'voice generation failed')}")
+                continue
+            line.audio_path = r["wav"]
+            line.audio_key = os.path.splitext(os.path.basename(r["wav"]))[0]
+            line.duration = r.get("duration", line.duration)
+            _fill_visemes(line, r.get("visemes", []))
+            casts.append(line.cast_id)
+    warnings = _rebuild(scene, casts, sounds=True)
+    proj.last_report = "; ".join(errors + warnings)
+    return errors
+
+
+def generate_lines(scene, line_ids=None, force=False):
+    """Voice and lip-sync lines now (blocking). Returns error messages."""
+    from . import voice
+    jobs = voice_jobs(scene, line_ids, force)
+    if not jobs:
+        return []
+    try:
+        results = voice.speak(jobs)
+    except voice.VoiceError as e:
+        raise CSKError(str(e))
+    return apply_voice_results(scene, results)
 
 
 # ---------------------------------------------------------------------------

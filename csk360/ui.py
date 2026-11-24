@@ -3,7 +3,7 @@
 
 import bpy
 
-from . import library
+from . import commands, library, voice
 from .model import MOUTH_SHAPES
 from .operators import active_item, context_cast
 
@@ -93,7 +93,10 @@ class CSK360_PT_cast(_Panel, bpy.types.Panel):
             box = layout.box()
             box.label(text=f"Editing: {cast.name}", icon="USER")
             box.prop(cast, "rig_type")
-            box.prop(cast, "voice")
+            row = box.row(align=True)
+            row.prop(cast, "voice")
+            row.operator("csk360.set_voice", text="", icon="VIEWZOOM")
+            box.prop(cast, "speed")
             box.operator("csk360.set_home", icon="PIVOT_CURSOR")
         layout.operator("csk360.rebuild", icon="FILE_REFRESH")
         if proj.last_report:
@@ -187,18 +190,45 @@ class CSK360_PT_dialogue(_Panel, bpy.types.Panel):
         col = row.column(align=True)
         col.operator("csk360.add_line", text="", icon="ADD")
         col.operator("csk360.remove_line", text="", icon="REMOVE")
+        row = layout.row(align=True)
+        row.operator("csk360.generate_lines", text="Generate All", icon="PLAY_SOUND").scope = "ALL"
+        row.operator("csk360.generate_lines", text="This Line").scope = "ACTIVE"
         line = active_item(proj.lines, proj.active_line_index)
         cast = context_cast(context)
         if line is None or cast is None or line.cast_id != cast.id:
             return
         col = layout.column()
+        if commands.line_needs_voice(context.scene, line):
+            col.label(text="Needs generating", icon="INFO")
         col.prop(line, "text")
-        col.prop(line, "start")
+        col.prop(line, "voice", text="Voice (blank = character's)")
+        if line.follows:
+            row = col.row()
+            row.label(text=f"Plays after {line.follows}", icon="LINKED")
+            row.prop(line, "follows", text="")
+        else:
+            col.prop(line, "start")
         col.prop(line, "audio_path")
         col.prop(line, "duration")
         col.prop(line, "emotion")
         shapes = "".join(MOUTH_SHAPES[v.shape] for v in line.visemes[:40])
         col.label(text=f"Mouth: {shapes or 'none yet'}")
+
+
+class CSK360_PT_voices(_Panel, bpy.types.Panel):
+    bl_label = "Voices"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw(self, context):
+        layout = self.layout
+        st = voice.status()
+        col = layout.column(align=True)
+        for key, label in (("kokoro", "Kokoro"), ("supertonic", "Supertonic 3"), ("rhubarb", "Rhubarb lip sync")):
+            col.label(text=label, icon="CHECKMARK" if st.get(key) else "X")
+        layout.operator("csk360.install_voices", icon="IMPORT")
+        if st.get("supertonic") and not st.get("supertonic_terms_accepted"):
+            layout.operator("csk360.accept_supertonic_terms", icon="ERROR")
+        layout.label(text=f"Folder: {voice.home()}")
 
 
 class CSK360_PT_library(_Panel, bpy.types.Panel):
@@ -231,6 +261,7 @@ classes = (
     CSK360_PT_clips,
     CSK360_PT_moves,
     CSK360_PT_dialogue,
+    CSK360_PT_voices,
     CSK360_PT_library,
 )
 

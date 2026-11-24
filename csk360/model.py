@@ -112,6 +112,12 @@ class CSK360_DialogueLine(bpy.types.PropertyGroup):
     duration: FloatProperty(name="Duration", description="From the audio file when there is one",
                             min=0.0, unit="TIME_ABSOLUTE", update=_changed)
     visemes: CollectionProperty(type=CSK360_Viseme)
+    follows: StringProperty(name="Follows",
+                            description="Id of the line this one plays after; its start then follows "
+                                        "that line's end automatically. Clear to place it freely",
+                            update=_changed)
+    audio_key: StringProperty(name="Voice Key",
+                              description="Text+voice+speed the audio was generated from; differs = needs regenerating")
 
 
 class CSK360_Project(bpy.types.PropertyGroup):

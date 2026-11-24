@@ -12,6 +12,9 @@ CSK360, and for scripts that **use** it inside Blender.
   `tests/helpers.py`.
 * Only `compiler.py` writes animation data. UI code calls `operators`, which call
   `commands`. Never add a feature that keys the rig directly from an operator.
+* Never import onnxruntime, numpy-heavy or ML packages in the extension itself.
+  Speech lives in `csk360/voice_service/` and runs in its own venv
+  (`~/.csk360/venv`) as a subprocess; `voice.py` is the only client.
 * User-facing errors raise `commands.CSKError` with a plain-English message.
 * Naming: operators `csk360.*`, classes `CSK360_OT_*` / `CSK360_PT_*`, sidebar tab `CSK360`.
 
@@ -31,6 +34,9 @@ commands.add_move(scene, leo, start=0, target="desk_chair", arrival="sit")
 commands.add_line(scene, leo, "Morning!", start=6,
                   audio_path="//voice/leo_01.wav",
                   visemes=[(0.0, "B"), (0.12, "C"), (0.4, "X")])
+commands.add_line(scene, leo, "Did you see the numbers?", after_previous=True,
+                  voice="supertonic/M1", generate=True)   # voiced + lip-synced now
+commands.generate_lines(scene)    # voice every new or edited line (blocking)
 print(commands.describe(scene))   # plain dict: cast, clips, moves, lines, library, warnings
 ```
 

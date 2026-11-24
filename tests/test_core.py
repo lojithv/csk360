@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 """Core behaviour: model, compiler, commands, operators."""
 
 import math
@@ -250,8 +250,16 @@ class DialogueTests(Base):
 
     def test_after_previous_line(self):
         commands.add_line(self.scene, "leo", "One", start=1.0, duration=2.0)
+        one = self.scene.csk360.lines[0].id
         lid = commands.add_line(self.scene, "leo", "Two", after_previous=True, duration=1.0)
-        self.assertAlmostEqual(commands.get_line(self.scene, lid).start, 3.0)
+        self.assertAlmostEqual(commands.get_line(self.scene, lid).start, 3.2, places=5)
+        # The follower moves when the first line gets longer (e.g. after voicing it).
+        commands.set_line(self.scene, one, duration=3.5)
+        self.assertAlmostEqual(commands.get_line(self.scene, lid).start, 4.7, places=5)
+        # Unlinking lets it be placed freely.
+        commands.set_line(self.scene, lid, follows="", start=10.0)
+        commands.set_line(self.scene, one, duration=1.0)
+        self.assertAlmostEqual(commands.get_line(self.scene, lid).start, 10.0)
 
     def test_missing_audio_warns(self):
         commands.add_line(self.scene, "leo", "Hi", start=0, audio_path="//nope.wav")

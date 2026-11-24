@@ -4,7 +4,7 @@
 import bpy
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, StringProperty
 
-from . import commands, library
+from . import commands, library, voice
 from .commands import CSKError
 from .model import CLIP_LAYERS, LOOP_MODES
 
@@ -314,6 +314,167 @@ class CSK360_OT_mark_asset(_CSKOperator, bpy.types.Operator):
         self.report({"INFO"}, f"'{action.name}' added to the CSK360 library")
 
 
+class _BackgroundOperator:
+    """Runs a voice.BackgroundJob and keeps the UI responsive while it works."""
+    _timer = None
+    _job = None
+
+    def start(self, context, job):
+        self._job = job
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.3, window=context.window)
+        wm.modal_handler_add(self)
+        return {"RUNNING_MODAL"}
+
+    def modal(self, context, event):
+        if event.type != "TIMER":
+            return {"PASS_THROUGH"}
+        job = self._job
+        context.workspace.status_text_set(f"CSK360: {self.bl_label}… {job.last_progress()}")
+        if not job.done:
+            return {"PASS_THROUGH"}
+        context.window_manager.event_timer_remove(self._timer)
+        context.workspace.status_text_set(None)
+        for area in context.screen.areas:
+            area.tag_redraw()
+        if job.error is not None:
+            self.report({"ERROR"}, str(job.error))
+            return {"CANCELLED"}
+        return self.finish(context, job.result)
+
+    def finish(self, context, result):
+        return {"FINISHED"}
+
+
+class CSK360_OT_install_voices(_BackgroundOperator, bpy.types.Operator):
+    """Download and set up offline voices (Kokoro, Supertonic 3) and Rhubarb lip sync, about 900 MB"""
+    bl_idname = "csk360.install_voices"
+    bl_label = "Install Voices"
+
+    supertonic_from: StringProperty(
+        name="Supertonic Folder", subtype="DIR_PATH",
+        description="Optional: copy Supertonic 3 from an existing folder (e.g. Frameling's) instead of downloading")
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self, width=420)
+
+    def draw(self, context):
+        col = self.layout.column()
+        col.label(text="Downloads about 900 MB into:")
+        col.label(text=voice.home())
+        col.prop(self, "supertonic_from")
+
+    def execute(self, context):
+        if not bpy.app.online_access:
+            self.report({"ERROR"}, "Turn on Preferences > System > Network > Allow Online Access first.")
+            return {"CANCELLED"}
+        job = voice.BackgroundJob(voice.setup, supertonic_from=bpy.path.abspath(self.supertonic_from) or None)
+        return self.start(context, job)
+
+    def finish(self, context, result):
+        voice.voices(refresh=True)
+        voice.status(refresh=True)
+        missing = [k for k in ("kokoro", "supertonic", "rhubarb") if not result.get(k)]
+        if missing:
+            self.report({"WARNING"}, f"Installed, but not ready: {', '.join(missing)}")
+        else:
+            self.report({"INFO"}, "Voices installed")
+        return {"FINISHED"}
+
+
+class CSK360_OT_accept_supertonic_terms(_CSKOperator, bpy.types.Operator):
+    bl_idname = "csk360.accept_supertonic_terms"
+    bl_label = "Accept Supertonic Terms"
+    bl_description = voice.SUPERTONIC_TERMS
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(
+            self, event, title="Supertonic 3 licence (OpenRAIL-M)", message=voice.SUPERTONIC_TERMS,
+            confirm_text="I Accept")
+
+    def run(self, context):
+        try:
+            voice.accept_supertonic_terms()
+        except voice.VoiceError as e:
+            raise CSKError(str(e))
+        voice.status(refresh=True)
+
+
+def _voice_items(self, context):
+    global _VOICE_ITEMS
+    _VOICE_ITEMS = [(v, v, "") for v in voice.voices()] or [("", "No voices installed", "")]
+    return _VOICE_ITEMS
+
+
+_VOICE_ITEMS = []
+
+
+class CSK360_OT_set_voice(_CSKOperator, bpy.types.Operator):
+    """Choose the character's voice"""
+    bl_idname = "csk360.set_voice"
+    bl_label = "Set Voice"
+    bl_property = "voice"
+
+    voice: EnumProperty(name="Voice", items=_voice_items)
+
+    @classmethod
+    def poll(cls, context):
+        return context_cast(context) is not None
+
+    def invoke(self, context, event):
+        context.window_manager.invoke_search_popup(self)
+        return {"RUNNING_MODAL"}
+
+    def run(self, context):
+        if not self.voice:
+            raise CSKError("No voices installed yet. Press Install Voices first.")
+        cast = context_cast(context)
+        cast.voice = self.voice
+
+
+class CSK360_OT_generate_lines(_BackgroundOperator, bpy.types.Operator):
+    """Voice and lip-sync dialogue lines that are new or whose text or voice changed"""
+    bl_idname = "csk360.generate_lines"
+    bl_label = "Generate Voices"
+
+    scope: EnumProperty(name="Lines", items=[
+        ("ACTIVE", "Active Line", ""),
+        ("CAST", "This Character", ""),
+        ("ALL", "All Lines", ""),
+    ], default="ALL")
+    force: BoolProperty(name="Regenerate", description="Regenerate even if up to date")
+
+    def execute(self, context):
+        scene = context.scene
+        proj = scene.csk360
+        ids = None
+        if self.scope == "ACTIVE":
+            line = active_item(proj.lines, proj.active_line_index)
+            ids = [line.id] if line else []
+        elif self.scope == "CAST":
+            cast = context_cast(context)
+            ids = [l.id for l in proj.lines if cast and l.cast_id == cast.id]
+        try:
+            jobs = commands.voice_jobs(scene, ids, self.force)
+        except CSKError as e:
+            self.report({"ERROR"}, str(e))
+            return {"CANCELLED"}
+        if not jobs:
+            self.report({"INFO"}, "All lines are up to date")
+            return {"FINISHED"}
+        self._scene_name = scene.name
+        return self.start(context, voice.BackgroundJob(voice.speak, jobs))
+
+    def finish(self, context, result):
+        scene = bpy.data.scenes.get(self._scene_name) or context.scene
+        errors = commands.apply_voice_results(scene, result)
+        if errors:
+            self.report({"WARNING"}, "; ".join(errors))
+        else:
+            self.report({"INFO"}, f"Voiced {len(result)} line(s)")
+        return {"FINISHED"}
+
+
 classes = (
     CSK360_OT_add_cast,
     CSK360_OT_add_starter_character,
@@ -328,6 +489,10 @@ classes = (
     CSK360_OT_remove_line,
     CSK360_OT_rebuild,
     CSK360_OT_mark_asset,
+    CSK360_OT_install_voices,
+    CSK360_OT_accept_supertonic_terms,
+    CSK360_OT_set_voice,
+    CSK360_OT_generate_lines,
 )
 
 
