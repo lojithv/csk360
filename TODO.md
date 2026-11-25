@@ -15,8 +15,8 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done, `[!]` blocked (reason given)
 - [ ] MCP server `csk360` (about 8 tools: list_library, validate, build, patch, preview, render, voices, describe_scene)
 
 ### Timeline and clip editing
-- [ ] Next / previous clip (`Alt+→` / `Alt+←`) jumps the playhead to clip boundaries
-- [ ] Split clip at the playhead (`K`)
+- [x] Next / previous clip (`Alt+→` / `Alt+←`) jumps the playhead to clip boundaries
+- [x] Split clip at the playhead (button and `csk360.split_clip`; the `K` key waits for the CSK360 workspace, since `K` is a Blender default)
 - [ ] Coloured clip bars drawn over the Timeline / Dope Sheet (gpu module), one row per character and layer
 - [ ] Clip name overlay above each character in the viewport
 
@@ -37,7 +37,7 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done, `[!]` blocked (reason given)
 - [ ] Listeners turn their heads toward whoever is speaking
 - [ ] Face layer expressions on the starter character (happy, sad, angry, surprised, worried, thinking)
 - [ ] Optional "talking" gesture loop on the Gesture layer while speaking
-- [ ] Copy generated audio next to the .blend (`//csk360_audio/`) so projects are portable
+- [x] Copy generated audio next to the .blend (`//csk360_audio/`) so projects are portable
 - [!] Test Supertonic 3 voices end to end: blocked until Lojith accepts its OpenRAIL-M terms (Voices panel)
 
 ### Preview and render

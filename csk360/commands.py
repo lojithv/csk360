@@ -22,7 +22,7 @@ class CSKError(Exception):
 
 
 CLIP_FIELDS = {"layer", "asset", "start", "duration", "loop_mode", "blend_in", "blend_out",
-               "with_line", "match_line"}
+               "with_line", "match_line", "offset"}
 MOVE_FIELDS = {"start", "speed", "walk_asset", "arrival_asset"}
 LINE_FIELDS = {"text", "voice", "emotion", "start", "audio_path", "duration", "follows"}
 
@@ -282,6 +282,102 @@ def change_clip_duration(scene, clip_id, delta_seconds):
     one_frame = 1.0 / compiler.fps(scene)
     set_clip(scene, clip_id, duration=max(one_frame, clip.duration + delta_seconds))
     return clip.duration
+
+
+def split_clip(scene, clip_id, at=None):
+    """Split a clip in two at `at` seconds (default: the playhead). Returns the new clip's id.
+
+    The second half continues the action where the first stopped, so playback looks the same."""
+    clip = get_clip(scene, clip_id)
+    at = playhead(scene) if at is None else at
+    one_frame = 1.0 / compiler.fps(scene)
+    end = clip.start + clip.duration
+    if not (clip.start + one_frame <= at <= end - one_frame):
+        raise CSKError("Put the playhead inside the clip to split it.")
+    proj = scene.csk360
+    with batch(scene):
+        new = proj.clips.add()
+        new.id = _new_id(proj, "clip")
+        for k in ("cast_id", "layer", "asset", "loop_mode", "blend_out", "with_line", "match_line"):
+            setattr(new, k, getattr(clip, k))
+        new.start = at
+        new.duration = end - at
+        new.offset = clip.offset + (at - clip.start)
+        new.blend_in = 0.0
+        new.match_line = False
+        clip.duration = at - clip.start
+        clip.blend_out = 0.0
+        if clip.with_line:
+            clip.match_line = False
+        proj.active_clip_index = len(proj.clips) - 1
+        new_id = new.id
+    _rebuild(scene, [clip.cast_id])
+    return new_id
+
+
+def clip_times(scene, cast_id=None):
+    """Sorted start and end times of clips, moves and lines (one cast, or all)."""
+    proj = scene.csk360
+    times = set()
+    for c in proj.clips:
+        if cast_id in (None, c.cast_id):
+            times.update((c.start, c.start + c.duration))
+    for m in proj.moves:
+        if cast_id in (None, m.cast_id):
+            times.update((m.start, m.start + m.duration))
+    for l in proj.lines:
+        if cast_id in (None, l.cast_id):
+            times.update((l.start, l.start + l.duration))
+    return sorted(times)
+
+
+def jump_to_clip(scene, direction=1, cast_id=None):
+    """Move the playhead to the next (1) or previous (-1) clip boundary. Returns the time or None."""
+    rate = compiler.fps(scene)
+    now = playhead(scene)
+    half = 0.5 / rate
+    times = clip_times(scene, cast_id)
+    pick = ([t for t in times if t > now + half][:1] if direction > 0
+            else [t for t in times if t < now - half][-1:])
+    if not pick:
+        return None
+    scene.frame_set(scene.frame_start + int(round(pick[0] * rate)))
+    return pick[0]
+
+
+def localize_audio(scene, blend_path=None, folder="csk360_audio"):
+    """Copy generated voice files next to the .blend and point lines at the copies.
+
+    Makes the project portable (the voice cache lives in the user's home folder).
+    Returns the number of files copied."""
+    import os
+    import shutil
+    blend_path = blend_path or bpy.data.filepath
+    if not blend_path:
+        return 0
+    from . import voice
+    cache = os.path.normcase(os.path.abspath(os.path.join(voice.home(), "cache")))
+    dest_dir = os.path.join(os.path.dirname(os.path.abspath(blend_path)), folder)
+    copied = 0
+    changed = []
+    with batch(scene):
+        for line in scene.csk360.lines:
+            if not line.audio_path:
+                continue
+            src = os.path.abspath(bpy.path.abspath(line.audio_path))
+            if os.path.normcase(os.path.dirname(src)) != cache or not os.path.isfile(src):
+                continue
+            os.makedirs(dest_dir, exist_ok=True)
+            dest = os.path.join(dest_dir, os.path.basename(src))
+            if not os.path.isfile(dest):
+                shutil.copyfile(src, dest)
+                copied += 1
+            line.audio_path = "//" + folder + "/" + os.path.basename(src)
+            changed.append(line.cast_id)
+    if changed:
+        with batch(scene):
+            compiler.compile_dialogue(scene, base_dir=os.path.dirname(os.path.abspath(blend_path)))
+    return copied
 
 
 def set_clip_with_line(scene, clip_id, line_id, match_duration=True):

@@ -121,6 +121,10 @@ class CSK360_PT_clips(_Panel, bpy.types.Panel):
         col.operator("csk360.add_clip", text="", icon="ADD").asset = ""
         col.operator("csk360.remove_clip", text="", icon="REMOVE")
 
+        row = layout.row(align=True)
+        row.operator("csk360.jump_clip", text="", icon="PREV_KEYFRAME").direction = "PREV"
+        row.operator("csk360.jump_clip", text="", icon="NEXT_KEYFRAME").direction = "NEXT"
+        row.operator("csk360.split_clip", icon="UNLINKED")
         clip = active_item(proj.clips, proj.active_clip_index)
         cast = context_cast(context)
         if clip is None or cast is None or clip.cast_id != cast.id:

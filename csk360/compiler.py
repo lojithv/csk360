@@ -131,24 +131,39 @@ def _place_clip(track, spec):
     natural = max(f1 - f0, 1.0)
     mode = spec["loop_mode"]
     name = spec["name"]
+    offset = int(spec.get("offset", 0))  # frames into the action (set by splitting a clip)
     strips = []
 
     if mode == "LOOP":
-        s = track.strips.new(name, a, action)
-        s.repeat = min(dur / natural, MAX_STRIP_FACTOR)
-        strips.append(s)
+        t, remaining = a, dur
+        o = offset % max(int(round(natural)), 1) if offset else 0
+        if o:
+            # Finish the cycle that was in progress, then loop normally.
+            part = min(int(round(natural)) - o, remaining)
+            s = track.strips.new(name, t, action)
+            s.action_frame_start = f0 + o
+            s.action_frame_end = f0 + o + part
+            strips.append(s)
+            t, remaining = t + part, remaining - part
+        if remaining > 0:
+            s = track.strips.new(name + (".loop" if strips else ""), t, action)
+            s.repeat = min(remaining / natural, MAX_STRIP_FACTOR)
+            strips.append(s)
     elif mode == "ONCE":
-        played = math.floor(natural)
-        s = track.strips.new(name, a, action)
-        if dur <= played:
-            s.action_frame_end = f0 + dur
+        played = max(math.floor(natural) - offset, 0)
+        start = f0 + min(offset, math.floor(natural))
+        if played:
+            s = track.strips.new(name, a, action)
+            if offset:
+                s.action_frame_start = start
+            if dur <= played:
+                s.action_frame_end = start + dur
+            elif start + played != f1:
+                s.action_frame_end = start + played
             strips.append(s)
-        else:
-            if played != natural:
-                s.action_frame_end = f0 + played
-            strips.append(s)
-            last = f0 + played
-            h = track.strips.new(name + ".hold", a + played, action)
+        if dur > played:
+            last = start + played
+            h = track.strips.new(name + (".hold" if strips else ""), a + played, action)
             h.action_frame_end = last + 1
             h.action_frame_start = last
             _set_length_factor(h, dur - played)
@@ -357,7 +372,8 @@ def compile_cast(scene, cast):
                 continue
             specs.append({"name": clip.id, "action": action, "start": clip.start,
                           "duration": clip.duration, "loop_mode": clip.loop_mode,
-                          "blend_in": clip.blend_in, "blend_out": clip.blend_out})
+                          "blend_in": clip.blend_in, "blend_out": clip.blend_out,
+                          "offset": round(clip.offset * fps(scene))})
         specs.extend(virtual[layer])
         if not specs:
             continue
@@ -381,8 +397,10 @@ def compile_cast(scene, cast):
     return warnings
 
 
-def compile_dialogue(scene):
-    """Rebuild all CSK360 sound strips and update line durations. Returns warnings."""
+def compile_dialogue(scene, base_dir=None):
+    """Rebuild all CSK360 sound strips and update line durations. Returns warnings.
+
+    `base_dir` resolves "//" paths when the .blend is about to be saved somewhere new."""
     warnings = []
     proj = scene.csk360
     clear_sounds(scene)
@@ -393,7 +411,8 @@ def compile_dialogue(scene):
     channel_of = {c.id: i + 1 for i, c in enumerate(proj.cast)}
     rate = fps(scene)
     for line in lines:
-        path = bpy.path.abspath(line.audio_path)
+        path = (bpy.path.abspath(line.audio_path, start=base_dir) if base_dir
+                else bpy.path.abspath(line.audio_path))
         if not os.path.isfile(path):
             warnings.append(f"{line.id}: audio file not found: {line.audio_path}")
             continue

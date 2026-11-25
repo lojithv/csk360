@@ -81,6 +81,9 @@ class CSK360_Clip(bpy.types.PropertyGroup):
     loop_mode: EnumProperty(name="Mode", items=LOOP_MODES, default="LOOP", update=_changed)
     blend_in: FloatProperty(name="Blend In", default=0.2, min=0.0, unit="TIME_ABSOLUTE", update=_changed)
     blend_out: FloatProperty(name="Blend Out", default=0.0, min=0.0, unit="TIME_ABSOLUTE", update=_changed)
+    offset: FloatProperty(name="Offset", description="Seconds into the action where the clip starts "
+                                                     "(set when a clip is split)",
+                          min=0.0, unit="TIME_ABSOLUTE", update=_changed)
     with_line: StringProperty(name="With Line",
                               description="Dialogue line this clip plays with; it moves with that line",
                               update=_changed)

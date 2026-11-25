@@ -182,6 +182,39 @@ class CSK360_OT_clip_duration(_CSKOperator, bpy.types.Operator):
         commands.change_clip_duration(scene, clip.id, delta)
 
 
+class CSK360_OT_split_clip(_CSKOperator, bpy.types.Operator):
+    """Split the active clip in two at the playhead"""
+    bl_idname = "csk360.split_clip"
+    bl_label = "Split Clip"
+
+    @classmethod
+    def poll(cls, context):
+        return len(context.scene.csk360.clips) > 0
+
+    def run(self, context):
+        proj = context.scene.csk360
+        clip = active_item(proj.clips, proj.active_clip_index)
+        if clip is None:
+            raise CSKError("Select a clip first.")
+        commands.split_clip(context.scene, clip.id)
+
+
+class CSK360_OT_jump_clip(_CSKOperator, bpy.types.Operator):
+    """Jump the playhead to the next or previous clip start or end of the character"""
+    bl_idname = "csk360.jump_clip"
+    bl_label = "Jump to Clip"
+    bl_options = {"REGISTER"}
+
+    direction: EnumProperty(items=[("NEXT", "Next", ""), ("PREV", "Previous", "")], default="NEXT")
+
+    def run(self, context):
+        cast = context_cast(context)
+        t = commands.jump_to_clip(context.scene, 1 if self.direction == "NEXT" else -1,
+                                  cast.id if cast else None)
+        if t is None:
+            self.report({"INFO"}, "No more clips that way")
+
+
 class CSK360_OT_add_move(_CSKOperator, bpy.types.Operator):
     """Walk the character to the 3D cursor, or to another selected object"""
     bl_idname = "csk360.add_move"
@@ -483,6 +516,8 @@ classes = (
     CSK360_OT_add_clip,
     CSK360_OT_remove_clip,
     CSK360_OT_clip_duration,
+    CSK360_OT_split_clip,
+    CSK360_OT_jump_clip,
     CSK360_OT_add_move,
     CSK360_OT_remove_move,
     CSK360_OT_add_line,

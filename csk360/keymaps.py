@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Default shortcuts. `]` / `[` change the active clip by one second,
-with Shift by one frame. Bound in Object Mode only (Pose mode uses the
+with Shift by one frame; Alt+Left / Alt+Right jump between clip boundaries.
+Bound in Object Mode only (Pose mode uses the
 bracket keys for hierarchy selection). Can be switched off in the
 extension preferences."""
 
@@ -27,6 +28,10 @@ def _add_keymaps():
         kmi = km.keymap_items.new("csk360.clip_duration", key, "PRESS", shift=shift)
         kmi.properties.delta = delta
         kmi.properties.by_frames = by_frames
+        _keymaps.append((km, kmi))
+    for key, direction in (("RIGHT_ARROW", "NEXT"), ("LEFT_ARROW", "PREV")):
+        kmi = km.keymap_items.new("csk360.jump_clip", key, "PRESS", alt=True)
+        kmi.properties.direction = direction
         _keymaps.append((km, kmi))
 
 
