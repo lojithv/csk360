@@ -547,7 +547,41 @@ class CSK360_OT_generate_lines(_BackgroundOperator, bpy.types.Operator):
         return {"FINISHED"}
 
 
+class CSK360_OT_render_video(bpy.types.Operator):
+    """Render the scene to an MP4 with sound, using a preset size"""
+    bl_idname = "csk360.render_video"
+    bl_label = "Render Video"
+
+    filepath: StringProperty(subtype="FILE_PATH", default="//render.mp4")
+    filter_glob: StringProperty(default="*.mp4", options={"HIDDEN"})
+    preset: EnumProperty(name="Size", items=[
+        ("1080p", "1080p (16:9)", ""), ("720p", "720p (16:9)", ""), ("9:16", "Vertical 9:16", ""),
+        ("square", "Square", ""), ("4k", "4K", "")], default="1080p")
+    engine: EnumProperty(name="Engine", items=[
+        ("workbench", "Workbench (fast)", ""), ("eevee", "EEVEE (nicer)", "")], default="eevee")
+    subtitles: EnumProperty(name="Subtitles", items=[
+        ("srt", "SRT File", "Write subtitles next to the video"),
+        ("burn", "Burned In", "Draw subtitles in the picture"),
+        ("both", "Both", ""), ("none", "None", "")], default="srt")
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {"RUNNING_MODAL"}
+
+    def execute(self, context):
+        from . import render
+        try:
+            path = render.render_video(context.scene, self.filepath, preset=self.preset,
+                                       engine=self.engine, subtitles=self.subtitles)
+        except (ValueError, RuntimeError) as e:
+            self.report({"ERROR"}, str(e))
+            return {"CANCELLED"}
+        self.report({"INFO"}, f"Rendered {path}")
+        return {"FINISHED"}
+
+
 classes = (
+    CSK360_OT_render_video,
     CSK360_OT_add_cast,
     CSK360_OT_add_starter_character,
     CSK360_OT_remove_cast,

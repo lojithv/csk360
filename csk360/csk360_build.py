@@ -7,6 +7,10 @@ Options:
     --save out.blend     save the result (default: overwrite the opened .blend, if any)
     --no-voices          skip voice generation (lines keep their text, no audio)
     --validate           only check the script and print problems
+    --render out.mp4     render an MP4 (H.264 + AAC) after building
+    --engine NAME        workbench (fast, default for --render) or eevee
+    --subtitles MODE     srt (default), burn, both or none
+    --frames A-B         render only frames A to B
     --json               print the report as JSON (for agents)
 
 Exit code 0 on success, 1 when the script has errors.
@@ -43,6 +47,9 @@ def main(argv):
     def opt(name):
         return opts[opts.index(name) + 1] if name in opts and opts.index(name) + 1 < len(opts) else None
 
+    if not bpy.data.filepath:
+        # No .blend given: start from an empty scene, not the default cube.
+        bpy.ops.wm.read_factory_settings(use_empty=True)
     pkg = _csk360()
     script_mod = importlib.import_module(pkg.__name__ + ".script")
     scene = bpy.context.scene
@@ -54,8 +61,17 @@ def main(argv):
         else:
             report = script_mod.build(scene, data, voices="--no-voices" not in opts)
             report["ok"] = not report["voice_errors"]
+            if opt("--render"):
+                render = importlib.import_module(pkg.__name__ + ".render")
+                frames = None
+                if opt("--frames"):
+                    a, _, b = opt("--frames").partition("-")
+                    frames = (int(a), int(b))
+                report["video"] = render.render_video(
+                    scene, opt("--render"), engine=opt("--engine") or "workbench",
+                    subtitles=opt("--subtitles") or "srt", frames=frames)
             save = opt("--save") or (bpy.data.filepath or None)
-            if save:
+            if save:  # after rendering, so the camera, stage and subtitles are saved too
                 bpy.ops.wm.save_as_mainfile(filepath=os.path.abspath(save))
                 report["saved"] = os.path.abspath(save)
     except script_mod.ScriptError as e:
@@ -70,7 +86,9 @@ def main(argv):
         if report.get("ok"):
             print(f"CSK360: built {len(report.get('cast', {}))} character(s), "
                   f"{len(report.get('clips', []))} clip(s), {len(report.get('moves', []))} move(s), "
-                  f"{len(report.get('lines', []))} line(s)" + (f"; saved {report['saved']}" if report.get("saved") else ""))
+                  f"{len(report.get('lines', []))} line(s)"
+                  + (f"; saved {report['saved']}" if report.get("saved") else "")
+                  + (f"; rendered {report['video']}" if report.get("video") else ""))
     return 0 if report.get("ok") else 1
 
 

@@ -254,6 +254,17 @@ class CSK360_PT_voices(_Panel, bpy.types.Panel):
         layout.label(text=f"Folder: {voice.home()}")
 
 
+class CSK360_PT_output(_Panel, bpy.types.Panel):
+    bl_label = "Output"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw(self, context):
+        layout = self.layout
+        r = context.scene.render
+        layout.label(text=f"{r.resolution_x} x {r.resolution_y}, {r.fps / r.fps_base:g} fps")
+        layout.operator("csk360.render_video", icon="RENDER_ANIMATION")
+
+
 class CSK360_PT_library(_Panel, bpy.types.Panel):
     bl_label = "Library"
     bl_options = {"DEFAULT_CLOSED"}
@@ -286,6 +297,7 @@ classes = (
     CSK360_PT_moves,
     CSK360_PT_dialogue,
     CSK360_PT_voices,
+    CSK360_PT_output,
     CSK360_PT_library,
 )
 

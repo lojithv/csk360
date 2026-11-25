@@ -9,7 +9,7 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done, `[!]` blocked (reason given)
 - [x] Scene script (doc format) in JSON and YAML (built-in YAML-subset parser, no PyYAML in Blender) and Frameling's screenplay text format
 - [x] `validate(script)`: check cast, assets, props, voices; precise errors with suggestions
 - [x] `build(script)`: cast (starter character when the rig doesn't exist), clips, moves, lines, voices
-- [x] CLI `csk360_build.py`: `blender -b [scene.blend] -P csk360/csk360_build.py -- script.yaml [--save out.blend] [--no-voices] [--validate] [--json]` (`--render` comes with render presets)
+- [x] CLI `csk360_build.py`: `blender -b [scene.blend] -P csk360/csk360_build.py -- script.yaml [--save out.blend] [--no-voices] [--validate] [--json]` plus `--render out.mp4 --engine --subtitles --frames`
 - [x] Gestures given with a line follow that line when it moves or gets voiced
 - [ ] Contact-sheet preview (`--preview sheet.png`): 12 frames with timestamps
 - [ ] MCP server `csk360` (about 8 tools: list_library, validate, build, patch, preview, render, voices, describe_scene)
@@ -41,8 +41,8 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done, `[!]` blocked (reason given)
 - [!] Test Supertonic 3 voices end to end: blocked until Lojith accepts its OpenRAIL-M terms (Voices panel)
 
 ### Preview and render
-- [ ] Render presets: 1080p, 9:16, square; EEVEE or Workbench; MP4 with audio
-- [ ] Subtitles from dialogue lines (text strips in the sequencer, optional SRT)
+- [x] Render presets: 1080p, 9:16, square; EEVEE or Workbench; MP4 with audio; automatic front camera and a simple stage when the scene has none
+- [x] Subtitles from dialogue lines: SRT file and/or burned in (camera-parented text; sequencer text strips would hide the 3D scene)
 
 ### Quality
 - [ ] Click through every panel and operator in a live Blender 5.3 window

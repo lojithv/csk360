@@ -62,6 +62,12 @@ blender -b -P csk360/csk360_build.py -- examples/coffee_break.yaml --save dist/c
 blender -b -P csk360/csk360_build.py -- examples/coffee_break.yaml --validate   # check only
 ```
 
+![A frame from examples/coffee_break.yaml, rendered with EEVEE and burned-in subtitles](docs/example_frame.png)
+
+Add `--render out.mp4` (with `--engine eevee|workbench` and `--subtitles srt|burn|both|none`)
+to render a video with sound. Without a camera or lights, CSK360 adds a front
+camera that frames the cast and a simple stage.
+
 Characters that don't exist in the .blend are created as starter characters.
 Errors name the timeline entry and suggest fixes ("no pose or action 'wavee'.
 Did you mean: wave?"). `--json` prints a machine-readable report.
