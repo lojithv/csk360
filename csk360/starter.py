@@ -306,15 +306,15 @@ def _sit():
 
 
 STARTER_ASSETS = {
-    "idle": (_idle, dict(kind="action", layer="BODY", loop=True, duration=4.0,
+    "idle": (_idle, dict(kind="action", layer="BODY", loop=True, duration=4.0, favorite=True,
                          category="Standing", tags="idle, stand, wait")),
-    "walk": (_walk, dict(kind="action", layer="BODY", loop=True, stride=0.35,
+    "walk": (_walk, dict(kind="action", layer="BODY", loop=True, stride=0.35, favorite=True,
                          category="Motion keys", tags="walk, move")),
-    "wave": (_wave, dict(kind="action", layer="GESTURE", category="Gestures",
+    "wave": (_wave, dict(kind="action", layer="GESTURE", category="Gestures", favorite=True,
                          tags="wave, hello, bye")),
-    "arms_crossed": (_arms_crossed, dict(kind="pose", layer="GESTURE", duration=3.0,
+    "arms_crossed": (_arms_crossed, dict(kind="pose", layer="GESTURE", duration=3.0, favorite=True,
                                          category="Gestures", tags="arms, cross, wait, annoyed")),
-    "sit": (_sit, dict(kind="pose", layer="BODY", duration=3.0,
+    "sit": (_sit, dict(kind="pose", layer="BODY", duration=3.0, favorite=True,
                        category="Sitting and kneeling", tags="sit, seat, chair")),
 }
 

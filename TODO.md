@@ -21,8 +21,8 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done, `[!]` blocked (reason given)
 - [ ] Clip name overlay above each character in the viewport
 
 ### Pose picker
-- [ ] Pie menu (`P`) of favourite poses and actions for the selected character
-- [ ] Full picker grid with category chips (Standing, Gestures, Sitting and kneeling, Lying, Motion keys) and search
+- [x] Pie menu (`P`) of favourite poses and actions for the selected character
+- [x] Full picker grid with category chips (Standing, Gestures, Sitting and kneeling, Lying, Motion keys) and search
 - [ ] Thumbnails for library items (auto-rendered from the starter character)
 - [ ] Save current pose to the library (`Ctrl+Shift+P`)
 

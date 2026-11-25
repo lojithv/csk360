@@ -140,6 +140,45 @@ class CSK360_OT_add_clip(_CSKOperator, bpy.types.Operator):
                           layer=None if self.layer == "AUTO" else self.layer)
 
 
+class CSK360_OT_pose_picker(bpy.types.Operator):
+    """Pick a pose or action for the character from the whole library"""
+    bl_idname = "csk360.pose_picker"
+    bl_label = "Poses and Actions"
+    bl_options = {"REGISTER"}
+
+    category: EnumProperty(name="Category", items=[("ALL", "All", "")]
+                           + [(c, c, "") for c in library.CATEGORIES], default="ALL")
+    search: StringProperty(name="Search", options={"TEXTEDIT_UPDATE"})
+
+    @classmethod
+    def poll(cls, context):
+        return context_cast(context) is not None
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_popup(self, width=420)
+
+    def draw(self, context):
+        layout = self.layout
+        cast = context_cast(context)
+        layout.label(text=f"Add to {cast.name} at the playhead" if cast else "Select a character")
+        chips = layout.grid_flow(row_major=True, columns=3, even_columns=True, align=True)
+        for ident, label, _ in [("ALL", "All", "")] + [(c, c, "") for c in library.CATEGORIES]:
+            chips.prop_enum(self, "category", ident, text=label)
+        layout.prop(self, "search", text="", icon="VIEWZOOM")
+        items = library.search(self.search, category=None if self.category == "ALL" else self.category)
+        if not items:
+            layout.label(text="Nothing matches.")
+            return
+        grid = layout.grid_flow(row_major=True, columns=3, even_columns=True)
+        for i in items:
+            op = grid.operator("csk360.add_clip", text=i["id"].replace("_", " ").title(),
+                               icon={"GESTURE": "VIEW_PAN", "FACE": "USER"}.get(i["layer"], "ARMATURE_DATA"))
+            op.asset = i["id"]
+
+    def execute(self, context):
+        return {"FINISHED"}
+
+
 class CSK360_OT_remove_clip(_CSKOperator, bpy.types.Operator):
     """Remove the active clip"""
     bl_idname = "csk360.remove_clip"
@@ -514,6 +553,7 @@ classes = (
     CSK360_OT_remove_cast,
     CSK360_OT_set_home,
     CSK360_OT_add_clip,
+    CSK360_OT_pose_picker,
     CSK360_OT_remove_clip,
     CSK360_OT_clip_duration,
     CSK360_OT_split_clip,

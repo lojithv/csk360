@@ -56,6 +56,16 @@ class StarterTests(unittest.TestCase):
         self.assertEqual((walk["loop_mode"], walk["stride"]), ("LOOP", 0.35))
         self.assertEqual(library.default_walk(), "walk")
 
+    def test_picker_search_and_pie_favourites(self):
+        ids = lambda items: [i["id"] for i in items]  # noqa: E731
+        self.assertEqual(ids(library.search("hello")), ["wave"])
+        self.assertEqual(ids(library.search("sit chair")), ["sit"])
+        self.assertEqual(ids(library.search("", category="Gestures")), ["arms_crossed", "wave"])
+        self.assertEqual(library.search("chair", category="Gestures"), [])
+        self.assertEqual(set(ids(library.favorites())), set(starter.STARTER_ASSETS))
+        self.assertTrue(hasattr(bpy.types, "CSK360_MT_pose_pie"))
+        self.assertTrue(hasattr(bpy.ops.csk360, "pose_picker"))
+
     def test_gestures_only_key_upper_body(self):
         for name, (_build, meta) in starter.STARTER_ASSETS.items():
             if meta["layer"] != "GESTURE":

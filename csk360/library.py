@@ -24,7 +24,11 @@ DEFAULT_META = {
     "stride": 0.0,         # metres per step for locomotion cycles (one cycle = two steps)
     "category": "",
     "tags": "",            # comma separated
+    "favorite": False,     # shown in the pose pie menu (P)
 }
+
+# Picker category chips, as in Frameling.
+CATEGORIES = ("Standing", "Gestures", "Sitting and kneeling", "Lying", "Motion keys")
 
 
 def fps(scene=None):
@@ -101,6 +105,7 @@ def info(action, scene=None):
         "stride": m["stride"],
         "category": m["category"],
         "tags": [t.strip() for t in m["tags"].split(",") if t.strip()],
+        "favorite": bool(m.get("favorite")),
     }
 
 
@@ -115,15 +120,25 @@ def default_walk():
     return ""
 
 
-def search(text="", layer=None, marked_only=True):
-    text = text.lower().strip()
+def favorites(limit=7):
+    """Assets for the pose pie: favourites first, then the rest, by name."""
+    items = search(marked_only=True)
+    items.sort(key=lambda i: (not i["favorite"], i["id"]))
+    return items[:limit]
+
+
+def search(text="", layer=None, marked_only=True, category=None):
+    """Library items matching all words of `text` in id, category or tags."""
+    words = text.lower().split()
     out = []
     for name in asset_ids(marked_only=marked_only):
         i = info(bpy.data.actions[name])
         if layer and i["layer"] != layer:
             continue
+        if category and i["category"] != category:
+            continue
         hay = " ".join([name.lower(), i["category"].lower(), " ".join(i["tags"]).lower()])
-        if text and text not in hay:
+        if not all(w in hay for w in words):
             continue
         out.append(i)
     return out

@@ -69,6 +69,23 @@ class CSK360_UL_lines(bpy.types.UIList):
                                 lambda l: l.start)
 
 
+class CSK360_MT_pose_pie(bpy.types.Menu):
+    """Favourite poses and actions for the selected character (P)"""
+    bl_idname = "CSK360_MT_pose_pie"
+    bl_label = "Pose"
+
+    def draw(self, context):
+        pie = self.layout.menu_pie()
+        if context_cast(context) is None:
+            pie.operator("csk360.add_cast", text="Add to Cast First", icon="ADD")
+            return
+        for item in library.favorites(7):
+            op = pie.operator("csk360.add_clip", text=item["id"].replace("_", " ").title(),
+                              icon=LAYER_ICONS.get(item["layer"], "ACTION"))
+            op.asset = item["id"]
+        pie.operator("csk360.pose_picker", text="More…", icon="THREE_DOTS")
+
+
 class _Panel:
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
@@ -115,6 +132,7 @@ class CSK360_PT_clips(_Panel, bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         proj = context.scene.csk360
+        layout.operator("csk360.pose_picker", text="Pick Pose or Action…", icon="ARMATURE_DATA")
         row = layout.row()
         row.template_list("CSK360_UL_clips", "", proj, "clips", proj, "active_clip_index", rows=4)
         col = row.column(align=True)
@@ -257,6 +275,7 @@ class CSK360_PT_library(_Panel, bpy.types.Panel):
 
 
 classes = (
+    CSK360_MT_pose_pie,
     CSK360_UL_cast,
     CSK360_UL_clips,
     CSK360_UL_moves,
