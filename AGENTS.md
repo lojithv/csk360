@@ -18,7 +18,33 @@ CSK360, and for scripts that **use** it inside Blender.
 * User-facing errors raise `commands.CSKError` with a plain-English message.
 * Naming: operators `csk360.*`, classes `CSK360_OT_*` / `CSK360_PT_*`, sidebar tab `CSK360`.
 
-## Driving CSK360 from a script
+## Building a scene from a script (cheapest for agents)
+
+Write one scene script and build it headless; don't drive Blender step by step.
+
+```yaml
+cast:
+  leo:  {character: leo, voice: kokoro/am_michael}     # created as a starter character if missing
+  maya: {character: maya, voice: supertonic/F1}
+timeline:
+  - {at: 0, who: maya, do: wave, for: 2}               # clip: asset, start, duration
+  - {at: 0, who: leo, move_to: [0.6, -1.5], then: sit} # or move_to: <object name>
+  - {at: 4, who: leo, say: "Morning!"}                 # voiced + lip-synced
+  - {after: prev, who: maya, say: "Hi.", gesture: arms_crossed}  # gesture follows the line
+output: {size: 1080p, fps: 24}                         # 1080p, 720p, 4k, 9:16, square
+```
+
+```
+blender -b [scene.blend] -P csk360/csk360_build.py -- scene.yaml --validate --json
+blender -b [scene.blend] -P csk360/csk360_build.py -- scene.yaml --save out.blend --json
+```
+
+Entry keys: at, after (prev), who, do, for, mode (loop/once/pose), layer, move_to,
+then, say, voice, gesture, face. Starter assets: idle, walk, wave, arms_crossed, sit.
+Validation errors name the entry and suggest the closest valid id; fix the text and rebuild.
+Frameling screenplays (`Name (expression, action): text`, `.txt`) also work.
+
+## Driving CSK360 from Python
 
 Inside Blender (installed as an extension the package is `bl_ext.user_default.csk360`;
 in the tests it is plain `csk360`):

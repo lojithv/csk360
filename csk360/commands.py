@@ -21,7 +21,8 @@ class CSKError(Exception):
     """A user-facing error with a plain-English message."""
 
 
-CLIP_FIELDS = {"layer", "asset", "start", "duration", "loop_mode", "blend_in", "blend_out"}
+CLIP_FIELDS = {"layer", "asset", "start", "duration", "loop_mode", "blend_in", "blend_out",
+               "with_line", "match_line"}
 MOVE_FIELDS = {"start", "speed", "walk_asset", "arrival_asset"}
 LINE_FIELDS = {"text", "voice", "emotion", "start", "audio_path", "duration", "follows"}
 
@@ -111,6 +112,14 @@ def _reflow(scene):
                 changed = True
         if not changed:
             break
+    for clip in scene.csk360.clips:
+        line = lines.get(clip.with_line)
+        if line is None:
+            continue
+        duration = line.duration if clip.match_line and line.duration > 0 else clip.duration
+        if abs(clip.start - line.start) > 1e-6 or abs(clip.duration - duration) > 1e-6:
+            clip.start, clip.duration = line.start, duration
+            moved.append(clip.cast_id)
     return moved
 
 
@@ -273,6 +282,16 @@ def change_clip_duration(scene, clip_id, delta_seconds):
     one_frame = 1.0 / compiler.fps(scene)
     set_clip(scene, clip_id, duration=max(one_frame, clip.duration + delta_seconds))
     return clip.duration
+
+
+def set_clip_with_line(scene, clip_id, line_id, match_duration=True):
+    """Make a clip (e.g. a gesture) start with a dialogue line and follow it when it moves."""
+    clip = get_clip(scene, clip_id)
+    get_line(scene, line_id)
+    with batch(scene):
+        clip.with_line = line_id
+        clip.match_line = match_duration
+    _rebuild(scene, [clip.cast_id], sounds=True)
 
 
 def remove_clip(scene, clip_id):

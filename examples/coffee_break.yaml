@@ -1,0 +1,12 @@
+# Two starter characters: Maya waves, Leo walks over and sits, then they talk.
+# Build it (voices need CSK360 > Voices > Install Voices once):
+#   blender -b -P csk360/csk360_build.py -- examples/coffee_break.yaml --save dist/coffee_break.blend
+cast:
+  leo:  {character: leo, voice: kokoro/am_michael}
+  maya: {character: maya, voice: kokoro/af_heart}
+timeline:
+  - {at: 0, who: maya, do: wave, for: 2}
+  - {at: 0, who: leo, move_to: [0.6, -1.5], then: sit}
+  - {at: 4, who: leo, say: "Morning! Did you see the numbers?"}
+  - {after: prev, who: maya, say: "I did. We need to talk.", gesture: arms_crossed}
+output: {size: 1080p, fps: 24}

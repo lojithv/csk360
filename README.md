@@ -51,6 +51,21 @@ To use one of your own actions as a library item, assign it to an object and
 press **Library → Add Action to Library**, then set its kind (pose, action,
 transition), layer, loop, default duration and stride.
 
+## Scene scripts (for agents and batch work)
+
+One text file builds a whole scene. Three formats are accepted: YAML in the
+shape of the design doc, the same structure as JSON, and Frameling's
+screenplay text (`Maya (happy, wave): Hi Leo!`). See [examples/](examples).
+
+```powershell
+blender -b -P csk360/csk360_build.py -- examples/coffee_break.yaml --save dist/coffee_break.blend
+blender -b -P csk360/csk360_build.py -- examples/coffee_break.yaml --validate   # check only
+```
+
+Characters that don't exist in the .blend are created as starter characters.
+Errors name the timeline entry and suggest fixes ("no pose or action 'wavee'.
+Did you mean: wave?"). `--json` prints a machine-readable report.
+
 ## Voices and lip sync
 
 Speech runs in a separate background process with its own Python environment

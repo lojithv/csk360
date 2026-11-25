@@ -81,6 +81,11 @@ class CSK360_Clip(bpy.types.PropertyGroup):
     loop_mode: EnumProperty(name="Mode", items=LOOP_MODES, default="LOOP", update=_changed)
     blend_in: FloatProperty(name="Blend In", default=0.2, min=0.0, unit="TIME_ABSOLUTE", update=_changed)
     blend_out: FloatProperty(name="Blend Out", default=0.0, min=0.0, unit="TIME_ABSOLUTE", update=_changed)
+    with_line: StringProperty(name="With Line",
+                              description="Dialogue line this clip plays with; it moves with that line",
+                              update=_changed)
+    match_line: BoolProperty(name="Match Line Length", default=True,
+                             description="Last as long as the line it plays with", update=_changed)
 
 
 class CSK360_Move(bpy.types.PropertyGroup):
