@@ -45,7 +45,8 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done, `[!]` blocked (reason given)
 - [x] Subtitles from dialogue lines: SRT file and/or burned in (camera-parented text; sequencer text strips would hide the 3D scene)
 
 ### Quality
-- [ ] Click through every panel and operator in a live Blender 5.3 window
+- [x] Headless draw test of every panel, list, menu and the picker (props, operators and operator properties exist)
+- [ ] Click through every panel and operator in a live Blender 5.3 window (`blender --python tools/dev_load.py` runs the repo copy without installing)
 - [ ] GitHub Actions: download Blender 5.3 and run the headless tests on each push
 - [ ] Golden-frame render tests for key features
 
