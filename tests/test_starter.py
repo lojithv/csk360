@@ -4,6 +4,7 @@
 import unittest
 
 import bpy
+from mathutils import Vector
 
 from csk360 import commands, library, starter
 
@@ -39,9 +40,10 @@ class StarterTests(unittest.TestCase):
     def test_mouth_shape_keys_follow_mouth_control(self):
         body = self.body()
         names = [k.name for k in body.data.shape_keys.key_blocks]
-        self.assertEqual(names, ["Basis"] + [f"mouth_{s}" for s in "ABCDEFGH"])
+        self.assertEqual(names, ["Basis"] + [f"mouth_{s}" for s in "ABCDEFGH"] + ["blink"])
         for fc in body.data.shape_keys.animation_data.drivers:
-            self.assertTrue(fc.driver.is_simple_expression, fc.data_path)
+            if fc.driver.type == "SCRIPTED":
+                self.assertTrue(fc.driver.is_simple_expression, fc.data_path)
         commands.add_line(self.scene, self.leo, "Ah", start=1.0,
                           visemes=[(0.0, "D"), (0.5, "F"), (1.0, "X")])
         self.assertEqual(self.mouth_values(25 + 1)["mouth_D"], 1.0)
@@ -84,7 +86,47 @@ class StarterTests(unittest.TestCase):
         rig = commands.get_cast(self.scene, maya).object
         self.scene.frame_set(20)
         self.assertLess(rig.pose.bones["upper_arm_R"].rotation_euler.x, -2.0)
-        self.assertAlmostEqual(self.rig.pose.bones["upper_arm_R"].rotation_euler.x, 0.0)
+        self.assertAlmostEqual(self.rig.pose.bones["upper_arm_R"].rotation_euler.x, 0.0, places=1)
+
+    def test_blinks(self):
+        commands.rebuild(self.scene)
+        values = [h.prop_at(self.scene, self.rig, "blink", f) for f in range(1, 24 * 8)]
+        closed = sum(1 for v in values if v > 0.9)
+        self.assertGreaterEqual(closed, 1)
+        self.assertLess(closed, 12)  # quick blinks, not closed eyes
+        body = self.body().evaluated_get(bpy.context.evaluated_depsgraph_get())
+        self.assertIn("blink", body.data.shape_keys.key_blocks)
+
+    def test_idle_fills_gaps_between_body_clips(self):
+        commands.add_clip(self.scene, self.leo, "sit", start=2.0, duration=2.0)
+        names = [s.name for s in self.rig.animation_data.nla_tracks["CSK360 Body"].strips]
+        self.assertEqual(names[0], "idle.0")
+        self.assertIn("idle.1", names)
+        idle = self.rig.animation_data.nla_tracks["CSK360 Body"].strips["idle.0"]
+        self.assertEqual((idle.frame_start, idle.frame_end), (1, 49))
+        commands.get_cast(self.scene, self.leo).auto_life = False
+        names = [s.name for s in self.rig.animation_data.nla_tracks["CSK360 Body"].strips]
+        self.assertEqual(names, [self.scene.csk360.clips[0].id])
+
+    def test_listener_looks_at_speaker(self):
+        maya = commands.add_starter_character(self.scene, "Maya", location=(3.0, 2.0, 0.0))
+        commands.add_line(self.scene, maya, "Hello Leo", start=1.0, duration=2.0)
+        head = self.rig.pose.bones["head"]
+
+        def facing(frame):
+            self.scene.frame_set(frame)
+            m = self.rig.matrix_world @ head.matrix
+            return (m.to_3x3() @ Vector((0, 0, 1))).normalized()
+
+        self.assertLess(facing(1).y, -0.99)            # straight ahead before Maya talks
+        f = facing(1 + 2 * 24)                         # mid-line: turned toward +X, where Maya is
+        self.assertGreater(f.x, 0.5)
+        self.assertAlmostEqual(f.z, 0.0, places=3)
+        self.assertLess(facing(1 + 5 * 24).y, -0.99)   # back to front afterwards
+        # Maya, who speaks, does not turn to herself.
+        maya_rig = commands.get_cast(self.scene, maya).object
+        self.scene.frame_set(1 + 2 * 24)
+        self.assertAlmostEqual(maya_rig.pose.bones["head"].rotation_euler.y, 0.0, places=3)
 
     def test_walk_move_with_starter_walk(self):
         mid = commands.add_move(self.scene, self.leo, start=0, point=(1.0, -0.8, 0.0))

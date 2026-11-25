@@ -18,16 +18,17 @@ import math
 import os
 
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 from . import library
 
 TRACK_PREFIX = "CSK360 "
 SOUND_PREFIX = "CSK360:"
-LAYER_ORDER = ("MOVE", "BODY", "GESTURE", "FACE", "MOUTH")
-TRACK_TITLES = {"MOVE": "Move", "BODY": "Body", "GESTURE": "Gesture", "FACE": "Face", "MOUTH": "Mouth"}
+LAYER_ORDER = ("MOVE", "BODY", "GESTURE", "FACE", "LIFE", "MOUTH")
+TRACK_TITLES = {"MOVE": "Move", "BODY": "Body", "GESTURE": "Gesture", "FACE": "Face",
+                "LIFE": "Life", "MOUTH": "Mouth"}
 BLEND_TYPES = {"MOVE": "REPLACE", "BODY": "REPLACE", "GESTURE": "COMBINE",
-               "FACE": "COMBINE", "MOUTH": "REPLACE"}
+               "FACE": "COMBINE", "LIFE": "COMBINE", "MOUTH": "REPLACE"}
 MOUTH_PROP = "mouth"
 TURN_SECONDS = 0.25
 FALLBACK_WALK_SPEED = 1.2  # m/s when no stride is known
@@ -44,7 +45,7 @@ def to_frame(scene, seconds):
 
 def generated_action_names(cast_id):
     base = library.GENERATED_PREFIX + cast_id
-    return (base + ".move", base + ".mouth")
+    return (base + ".move", base + ".mouth", base + ".life")
 
 
 # ---------------------------------------------------------------------------
@@ -342,6 +343,145 @@ def _build_mouth_track(scene, obj, cast, lines):
 
 
 # ---------------------------------------------------------------------------
+# Life: blinks, idle fill, listeners look at the speaker
+# ---------------------------------------------------------------------------
+
+BLINK_PROP = "blink"
+HEAD_BONE = "head"
+MAX_LOOK = math.radians(60)
+
+
+def scene_seconds(scene):
+    return max((scene.frame_end - scene.frame_start) / fps(scene), 0.0)
+
+
+def root_keys(scene, cast):
+    """(time, position, yaw) keys of the character's root over time."""
+    moves = sorted((m for m in scene.csk360.moves if m.cast_id == cast.id), key=lambda m: m.start)
+    if not moves:
+        return [(0.0, Vector(cast.home), cast.home_yaw)]
+    keys, _virtual = _compile_moves(scene, cast, moves, [])
+    return keys
+
+
+def pose_at(keys, t):
+    """Linear interpolation of root keys at time t -> (position, yaw)."""
+    if t <= keys[0][0]:
+        return keys[0][1], keys[0][2]
+    for (t0, p0, y0), (t1, p1, y1) in zip(keys, keys[1:]):
+        if t0 <= t <= t1:
+            f = 0.0 if t1 - t0 < 1e-9 else (t - t0) / (t1 - t0)
+            return p0.lerp(p1, f), y0 + (y1 - y0) * f
+    return keys[-1][1], keys[-1][2]
+
+
+def _idle_specs(scene, cast, body_specs):
+    """Fill gaps (over 0.5 s) between Body clips with the idle loop, up to the scene end."""
+    idle = library.resolve(cast.idle_asset or "idle")
+    if idle is None:
+        return []
+    covered = sorted((s["start"], s["start"] + s["duration"]) for s in body_specs)
+    gaps, t = [], 0.0
+    for a, b in covered:
+        if a - t > 0.5:
+            gaps.append((t, a))
+        t = max(t, b)
+    end = scene_seconds(scene)
+    if end - t > 0.5:
+        gaps.append((t, end))
+    return [{"name": f"idle.{i}", "action": idle, "start": a, "duration": b - a,
+             "loop_mode": "LOOP", "blend_in": 0.3, "blend_out": 0.0}
+            for i, (a, b) in enumerate(gaps)]
+
+
+def _blink_keys(scene, cast):
+    import random
+    rng = random.Random(cast.id)  # same blinks every rebuild
+    end = scene_seconds(scene)
+    frame = 1.0 / fps(scene)
+    keys, t = [], rng.uniform(0.8, 2.5)
+    while t < end:
+        t0 = round(t / frame) * frame  # on whole frames, so the closed eye is actually rendered
+        keys += [(t0, 0.0), (t0 + frame, 1.0), (t0 + 2 * frame, 1.0), (t0 + 4 * frame, 0.0)]
+        t += rng.uniform(2.0, 5.0)
+    return keys
+
+
+def _look_keys(scene, cast, root):
+    """Head yaw keys: turn toward whoever else is speaking."""
+    proj = scene.csk360
+    others = {c.id: c for c in proj.cast if c.id != cast.id}
+    paths = {}
+    segments = []  # (start, end, head angle)
+    lines = sorted((l for l in proj.lines if l.cast_id in others and l.duration > 0), key=lambda l: l.start)
+    for line in lines:
+        speaker = others[line.cast_id]
+        if speaker.id not in paths:
+            paths[speaker.id] = root_keys(scene, speaker)
+        mid = line.start + line.duration * 0.5
+        me, my_yaw = pose_at(root, mid)
+        them, _ = pose_at(paths[speaker.id], mid)
+        d = them - me
+        d.z = 0.0
+        if d.length < 1e-3:
+            continue
+        d.rotate(Matrix.Rotation(-my_yaw, 3, "Z"))  # into the character's own frame
+        angle = max(-MAX_LOOK, min(MAX_LOOK, math.atan2(d.x, -d.y)))
+        segments.append((line.start, line.start + line.duration, angle))
+
+    keys, current = [], 0.0
+
+    def add(t, v):
+        if not keys or t > keys[-1][0] + 1e-4:
+            keys.append((t, v))
+
+    for i, (a, b, angle) in enumerate(segments):
+        add(max(a - 0.2, 0.0), current)
+        add(a + 0.15, angle)
+        add(b, angle)
+        nxt = segments[i + 1][0] if i + 1 < len(segments) else None
+        if nxt is None or nxt > b + 0.6:
+            add(b + 0.4, 0.0)
+            current = 0.0
+        else:
+            current = angle
+    return keys
+
+
+def _build_life_track(scene, obj, cast):
+    if not cast.auto_life:
+        return
+    blink = _blink_keys(scene, cast) if BLINK_PROP in obj.keys() else []
+    has_head = obj.type == "ARMATURE" and obj.pose and HEAD_BONE in obj.pose.bones
+    look = _look_keys(scene, cast, root_keys(scene, cast)) if has_head else []
+    if not blink and not look:
+        return
+    action, cb = _new_generated_action(generated_action_names(cast.id)[2], obj)
+    if blink:
+        fc = _fcurve(cb, f'["{BLINK_PROP}"]')
+        for t, v in blink:
+            _key(fc, to_frame(scene, t), v, "LINEAR")
+    if look:
+        pb = obj.pose.bones[HEAD_BONE]
+        index = 1  # bone-local Y = vertical axis for an upright head
+        if pb.rotation_mode in ("QUATERNION", "AXIS_ANGLE"):
+            look = []  # only Euler heads for now
+        fc = _fcurve(cb, f'pose.bones["{HEAD_BONE}"].rotation_euler', index)
+        for t, v in look:
+            _key(fc, to_frame(scene, t), v, "BEZIER")
+    f0, f1 = action.frame_range
+    a = math.floor(f0)
+    track = obj.animation_data.nla_tracks.new()
+    track.name = _track_name("LIFE", 0)
+    s = track.strips.new("life", a, action)
+    s.action_frame_end = math.ceil(f1) + 1
+    s.action_frame_start = a
+    _ensure_slot(s)
+    s.blend_type = BLEND_TYPES["LIFE"]
+    s.extrapolation = "NOTHING"
+
+
+# ---------------------------------------------------------------------------
 # Public entry points
 # ---------------------------------------------------------------------------
 
@@ -375,6 +515,8 @@ def compile_cast(scene, cast):
                           "blend_in": clip.blend_in, "blend_out": clip.blend_out,
                           "offset": round(clip.offset * fps(scene))})
         specs.extend(virtual[layer])
+        if layer == "BODY" and cast.auto_life:
+            specs.extend(_idle_specs(scene, cast, specs))
         if not specs:
             continue
         rate = fps(scene)
@@ -392,6 +534,7 @@ def compile_cast(scene, cast):
         for spec in sorted(specs, key=lambda s: s["span"][0]):
             _place_clip(tracks[spec["sub"]], spec)
 
+    _build_life_track(scene, obj, cast)
     lines = sorted((l for l in proj.lines if l.cast_id == cast.id), key=lambda l: l.start)
     _build_mouth_track(scene, obj, cast, lines)
     return warnings

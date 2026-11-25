@@ -114,6 +114,7 @@ class CSK360_PT_cast(_Panel, bpy.types.Panel):
             row.prop(cast, "voice")
             row.operator("csk360.set_voice", text="", icon="VIEWZOOM")
             box.prop(cast, "speed")
+            box.prop(cast, "auto_life")
             box.operator("csk360.set_home", icon="PIVOT_CURSOR")
         layout.operator("csk360.rebuild", icon="FILE_REFRESH")
         if proj.last_report:

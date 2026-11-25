@@ -20,6 +20,7 @@ from .model import MOUTH_SHAPES
 
 RIG_TYPE = "biped_toon"
 MOUTH_PROP = "mouth"
+BLINK_PROP = "blink"
 
 # name: (head, tail, parent). Left side is +X; right side is mirrored.
 _CENTER_BONES = {
@@ -151,6 +152,7 @@ def _build_body(name, rig):
     bm = bmesh.new()
     deform = bm.verts.layers.deform.verify()
     mouth_verts = []
+    eyes = []  # (centre, verts)
     for part in _PARTS + [_MOUTH]:
         bone, centre, radii, mat = part
         matrix = Matrix.Translation(centre) @ Matrix.Diagonal((*radii, 1.0))
@@ -164,8 +166,11 @@ def _build_body(name, rig):
             f.smooth = True
         if part is _MOUTH:
             mouth_verts = verts
+        elif mat == "eye":
+            eyes.append((Vector(centre), verts))
     bm.verts.index_update()
     mouth_idx = [v.index for v in mouth_verts]
+    eye_idx = [(c, [v.index for v in vs]) for c, vs in eyes]
     bm.to_mesh(mesh)
     bm.free()
 
@@ -192,6 +197,22 @@ def _build_body(name, rig):
         var.targets[0].id = rig
         var.targets[0].data_path = f'["{MOUTH_PROP}"]'
         drv.expression = f"m == {i}"
+
+    # Blink: eyes squash shut, driven directly by rig["blink"] (0 open .. 1 closed).
+    kb = body.shape_key_add(name="blink", from_mix=False)
+    for centre, idx in eye_idx:
+        for vi in idx:
+            co = mesh.vertices[vi].co - centre
+            kb.data[vi].co = centre + Vector((co.x, co.y, co.z * 0.08))
+    fc = kb.driver_add("value")
+    drv = fc.driver
+    drv.type = "AVERAGE"
+    var = drv.variables.new()
+    var.name = "b"
+    var.type = "SINGLE_PROP"
+    var.targets[0].id_type = "OBJECT"
+    var.targets[0].id = rig
+    var.targets[0].data_path = f'["{BLINK_PROP}"]'
     return body
 
 
@@ -206,6 +227,8 @@ def create_character(scene, name="Leo", location=(0.0, 0.0, 0.0), collection=Non
     rig[MOUTH_PROP] = 0
     ui = rig.id_properties_ui(MOUTH_PROP)
     ui.update(min=0, max=len(MOUTH_SHAPES) - 1, description="Mouth shape: 0=X rest, 1..8 = A..H")
+    rig[BLINK_PROP] = 0.0
+    rig.id_properties_ui(BLINK_PROP).update(min=0.0, max=1.0, description="Eyes: 0 open, 1 closed")
 
     # Edit bones need edit mode on an active object.
     view_layer = bpy.context.view_layer

@@ -32,9 +32,9 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done, `[!]` blocked (reason given)
 - [ ] Turn-in-place clip for turns over 90°
 
 ### Character life and dialogue
-- [ ] Blinks every 2–5 s (starter character eyelids + `blink` control)
-- [ ] Idle when no Body clip is active
-- [ ] Listeners turn their heads toward whoever is speaking
+- [x] Blinks every 2–5 s (starter character eyelids + `blink` control)
+- [x] Idle when no Body clip is active
+- [x] Listeners turn their heads toward whoever is speaking
 - [ ] Face layer expressions on the starter character (happy, sad, angry, surprised, worried, thinking)
 - [ ] Optional "talking" gesture loop on the Gesture layer while speaking
 - [x] Copy generated audio next to the .blend (`//csk360_audio/`) so projects are portable

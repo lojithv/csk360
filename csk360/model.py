@@ -67,6 +67,10 @@ class CSK360_CastMember(bpy.types.PropertyGroup):
     speed: FloatProperty(name="Voice Speed", default=1.0, min=0.25, max=4.0)
     home: FloatVectorProperty(name="Start Position", size=3, subtype="TRANSLATION", update=_changed)
     home_yaw: FloatProperty(name="Start Facing", subtype="ANGLE", update=_changed)
+    auto_life: BoolProperty(name="Bring to Life", default=True, update=_changed,
+                            description="Blink, idle when no body clip plays, and look at whoever is speaking")
+    idle_asset: StringProperty(name="Idle", description="Looping idle action; empty = the library's 'idle'",
+                               update=_changed)
 
 
 class CSK360_Clip(bpy.types.PropertyGroup):

@@ -133,6 +133,9 @@ def _rebuild(scene, cast_ids=(), sounds=False):
             if moved:
                 warnings = compiler.compile_dialogue(scene)
                 cast_ids = list(cast_ids) + moved
+        if len(proj.cast) > 1 and len(proj.lines) and cast_ids:
+            # Listeners look at speakers, so one character's change can move another's head.
+            cast_ids = list(cast_ids) + [c.id for c in proj.cast if c.auto_life]
         for cid in dict.fromkeys(cast_ids):
             for c in proj.cast:
                 if c.id == cid:
