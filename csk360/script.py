@@ -37,7 +37,7 @@ EXPRESSIONS = ("neutral", "happy", "sad", "angry", "surprised", "thinking", "win
 SIZES = {"1080p": (1920, 1080), "720p": (1280, 720), "4k": (3840, 2160),
          "9:16": (1080, 1920), "vertical": (1080, 1920), "square": (1080, 1080)}
 ENTRY_KEYS = {"at", "after", "who", "do", "for", "move_to", "then", "say", "face", "gesture",
-              "voice", "speed", "mode", "layer", "pick_up", "put_down", "helpers"}
+              "voice", "speed", "mode", "layer", "pick_up", "put_down", "helpers", "jump_onto"}
 
 
 class ScriptError(CSKError):
@@ -374,10 +374,11 @@ def validate(script, scene=None):
             errors.append(f"{where}: 'at' must be seconds, e.g. at: 6.")
         if "after" in e and e["after"] != "prev":
             errors.append(f"{where}: only 'after: prev' is supported.")
-        if not any(k in e for k in ("do", "move_to", "say", "gesture", "face", "pick_up", "put_down")):
+        if not any(k in e for k in ("do", "move_to", "say", "gesture", "face", "pick_up", "put_down",
+                                    "jump_onto")):
             errors.append(f"{where}: nothing to do; use do, move_to, say, gesture, face, "
                           "pick_up or put_down.")
-        for key in ("pick_up", "put_down"):
+        for key in ("pick_up", "put_down", "jump_onto"):
             t = e.get(key)
             if key in e and isinstance(t, str) and t != "front" and scene is not None \
                     and bpy.data.objects.get(t) is None:
@@ -509,6 +510,15 @@ def build(scene, script, voices=True, clear=True):
             made["clips"].append(cid)
             c = commands.get_clip(scene, cid)
             end = max(end, c.start + c.duration)
+        if "jump_onto" in e:
+            try:
+                mid = commands.add_move(scene, who, start=start or end, target=str(e["jump_onto"]),
+                                        jump=True, arrival=e.get("then", ""))
+            except CSKError as err:
+                raise ScriptError([f"timeline entry for {e['who']}: {err}"])
+            m = commands.get_move(scene, mid)
+            made["moves"].append(mid)
+            end = m.start + m.duration
         if "pick_up" in e:
             try:
                 kid = commands.pick_up(scene, who, str(e["pick_up"]), start=start or end,

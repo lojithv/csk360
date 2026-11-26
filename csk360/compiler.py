@@ -274,9 +274,34 @@ def _yaw_towards(delta, previous):
     return previous + turn
 
 
+JUMP_UP_SECONDS = 0.55     # take-off to landing
+JUMP_LEAD = 0.22           # the jump action crouches this long before take-off
+JUMP_PEAK = 0.0            # extra arc height; the jump action itself supplies the hop
+JUMP_DOWN_DIST = 0.55      # horizontal distance covered when jumping down
+
+
+def _jump_keys(t0, a, b, yaw, keys):
+    """Arc from a to b starting at t0; returns landing time."""
+    mid = a.lerp(b, 0.5)
+    mid.z = max(a.z, b.z) + JUMP_PEAK
+    keys.append((t0, a.copy(), yaw))
+    keys.append((t0 + JUMP_UP_SECONDS * 0.5, mid, yaw))
+    keys.append((t0 + JUMP_UP_SECONDS, b.copy(), yaw))
+    return t0 + JUMP_UP_SECONDS
+
+
+def _jump_clip(virtual, name, takeoff):
+    act = library.resolve("jump")
+    if act is not None:
+        virtual["BODY"].append({"name": name, "action": act, "start": max(takeoff - JUMP_LEAD, 0.0),
+                                "duration": JUMP_UP_SECONDS + JUMP_LEAD + 0.3, "loop_mode": "ONCE",
+                                "blend_in": 0.1, "blend_out": 0.15})
+
+
 def _compile_moves(scene, cast, moves, warnings):
     """Returns (move keys, virtual clip specs per layer)."""
     pos = Vector(cast.home)
+    floor = pos.z
     yaw = cast.home_yaw
     keys = [(0.0, pos.copy(), yaw)]
     virtual = {"BODY": [], "GESTURE": [], "FACE": []}
@@ -287,31 +312,67 @@ def _compile_moves(scene, cast, moves, warnings):
             warnings.append(f"{move.id}: no target object")
             move.duration = 0.0
             continue
-        target.z = pos.z
-        delta = target - pos
-        delta.z = 0.0
-        dist = delta.length
         start = max(move.start, t_free)
         if start > move.start + 1e-6:
             warnings.append(f"{move.id}: starts during the previous move, delayed to {start:.2f}s")
         speed = _walk_speed(scene, move)
+        t = start
+        jump_up = move.jump and move.target_kind == "OBJECT" and move.target_object is not None
+        if jump_up:
+            from . import world
+            top = world.measure(move.target_object)["top"]
+            rise = top - pos.z
+            if rise > cast.jump_height + 1e-6:
+                warnings.append(f"{move.id}: {cast.name} can't jump {rise:.2f} m "
+                                f"(jumps {cast.jump_height:.2f} m); walks up to it instead")
+                jump_up = False
+        # Jumping down first when standing on something and the target is lower.
+        want_z = Vector(move.target_point).z if move.target_kind == "POINT" else floor
+        if not jump_up and pos.z > want_z + 0.05:
+            flat = target - pos
+            flat.z = 0.0
+            d = flat.normalized() if flat.length > 1e-4 else Vector((0.0, -1.0, 0.0))
+            yaw2 = _yaw_towards(d, yaw)
+            land = pos + d * JUMP_DOWN_DIST
+            land.z = want_z
+            keys.append((t, pos.copy(), yaw))
+            _jump_clip(virtual, f"{move.id}.jump_down", t + JUMP_LEAD)
+            t = _jump_keys(t + JUMP_LEAD, pos, land, yaw2, keys)
+            pos, yaw = land, yaw2
+        target.z = pos.z
+        delta = target - pos
+        delta.z = 0.0
+        dist = delta.length
         dur = dist / speed if dist > 1e-4 else 0.0
-        move.duration = dur
         if dur > 0.0:
             new_yaw = _yaw_towards(delta, yaw)
             turn = min(TURN_SECONDS, dur * 0.5)
-            keys.append((start, pos.copy(), yaw))
-            keys.append((start + turn, pos + delta * (turn / dur), new_yaw))
-            keys.append((start + dur, target.copy(), new_yaw))
+            keys.append((t, pos.copy(), yaw))
+            keys.append((t + turn, pos + delta * (turn / dur), new_yaw))
+            keys.append((t + dur, target.copy(), new_yaw))
             if move.walk_asset:
                 walk = library.resolve(move.walk_asset)
                 if walk is None:
                     warnings.append(f"{move.id}: walk asset '{move.walk_asset}' not found")
                 else:
                     virtual["BODY"].append({"name": f"{move.id}.walk", "action": walk,
-                                            "start": start, "duration": dur, "loop_mode": "LOOP",
+                                            "start": t, "duration": dur, "loop_mode": "LOOP",
                                             "blend_in": 0.2, "blend_out": 0.0})
             pos, yaw = target, new_yaw
+            t += dur
+        if jump_up:
+            from . import world
+            m = world.measure(move.target_object)
+            c = m["center"]
+            top_pt = Vector((c[0], c[1], m["top"]))
+            d = top_pt - pos
+            d.z = 0.0
+            yaw2 = _yaw_towards(d, yaw) if d.length > 1e-4 else yaw
+            keys.append((t, pos.copy(), yaw))
+            _jump_clip(virtual, f"{move.id}.jump", t + JUMP_LEAD)
+            t = _jump_keys(t + JUMP_LEAD, pos, top_pt, yaw2, keys)
+            pos, yaw = top_pt, yaw2
+        move.duration = t - start
         if move.arrival_asset:
             act = library.resolve(move.arrival_asset)
             if act is None:
@@ -319,10 +380,10 @@ def _compile_moves(scene, cast, moves, warnings):
             else:
                 i = library.info(act, scene)
                 virtual[i["layer"]].append({"name": f"{move.id}.arrive", "action": act,
-                                            "start": start + dur, "duration": i["duration"],
+                                            "start": t, "duration": i["duration"],
                                             "loop_mode": i["loop_mode"],
                                             "blend_in": 0.2, "blend_out": 0.0})
-        t_free = start + dur
+        t_free = t
     return keys, virtual
 
 

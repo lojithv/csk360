@@ -136,6 +136,8 @@ class CSK360_Move(bpy.types.PropertyGroup):
                                update=_changed)
     arrival_asset: StringProperty(name="On Arrival", description="Action played on arrival, e.g. sit",
                                   update=_changed)
+    jump: BoolProperty(name="Jump Onto", update=_changed,
+                       description="Walk up to the object, then jump onto its top")
     duration: FloatProperty(name="Duration", description="Computed from distance and speed",
                             unit="TIME_ABSOLUTE")
 

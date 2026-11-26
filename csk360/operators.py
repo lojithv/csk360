@@ -295,7 +295,7 @@ class CSK360_OT_click_move(bpy.types.Operator):
     bl_options = {"UNDO"}
 
     STATUS = ("Click the floor or a prop to walk there  ·  Shift+click: add another walk  ·  "
-              "Right-click or Esc: done")
+              "Alt+click a surface: jump onto it  ·  Right-click or Esc: done")
 
     @classmethod
     def poll(cls, context):
@@ -371,7 +371,8 @@ class CSK360_OT_click_move(bpy.types.Operator):
                                       after_previous=self.added > 0)
                 else:
                     commands.add_move(scene, self.cast_id, target=result["target"],
-                                      arrival=result["arrival"], after_previous=self.added > 0)
+                                      arrival=result["arrival"], after_previous=self.added > 0,
+                                      jump=event.alt)
             except CSKError as e:
                 self.report({"ERROR"}, str(e))
                 return self._finish(context)

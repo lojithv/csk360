@@ -24,7 +24,7 @@ class CSKError(Exception):
 
 CLIP_FIELDS = {"layer", "asset", "start", "duration", "loop_mode", "blend_in", "blend_out",
                "with_line", "match_line", "offset"}
-MOVE_FIELDS = {"start", "speed", "walk_asset", "arrival_asset"}
+MOVE_FIELDS = {"start", "speed", "walk_asset", "arrival_asset", "jump"}
 LINE_FIELDS = {"text", "voice", "emotion", "start", "audio_path", "duration", "follows"}
 
 
@@ -498,7 +498,7 @@ def moves_end(scene, cast_id):
 
 
 def add_move(scene, cast_id, start=None, point=None, target=None, speed=0.0,
-             walk=None, arrival="", after_previous=False):
+             walk=None, arrival="", after_previous=False, jump=False):
     """Walk to `point` (x, y, z) or to `target` (object or object name).
     `after_previous` starts when the character's last move ends (else at the playhead)."""
     get_cast(scene, cast_id)
@@ -511,6 +511,12 @@ def add_move(scene, cast_id, start=None, point=None, target=None, speed=0.0,
         if obj is None:
             raise CSKError(f"No object named '{target}'.")
         target = obj
+    if jump:
+        if target is None:
+            raise CSKError("Jumping needs an object to jump onto.")
+        ok, why = world.can_jump_onto(scene, cast_id, target)
+        if not ok:
+            raise CSKError(why)
     walk = library.default_walk() if walk is None else walk
     if walk:
         walk = _resolve_asset(walk).name
@@ -531,6 +537,7 @@ def add_move(scene, cast_id, start=None, point=None, target=None, speed=0.0,
         m.speed = speed
         m.walk_asset = walk
         m.arrival_asset = arrival
+        m.jump = bool(jump)
         proj.active_move_index = len(proj.moves) - 1
         move_id = m.id
     _rebuild(scene, [cast_id])
@@ -881,7 +888,7 @@ def describe(scene):
                    "target": (m.target_object.name if m.target_kind == "OBJECT" and m.target_object
                               else [round(x, 4) for x in m.target_point]),
                    "duration": round(m.duration, 4), "walk": m.walk_asset,
-                   "arrival": m.arrival_asset} for m in proj.moves],
+                   "arrival": m.arrival_asset, "jump": m.jump} for m in proj.moves],
         "carries": [{"id": c.id, "who": c.cast_id, "object": c.object.name if c.object else None,
                      "start": round(c.start, 4), "end": round(c.end, 4), "put": c.put_kind}
                     for c in proj.carries],
