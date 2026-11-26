@@ -49,6 +49,15 @@ class JumpTests(unittest.TestCase):
         clips = [s.name for t in self.rig.animation_data.nla_tracks for s in t.strips]
         self.assertTrue(any(n.endswith(".jump") for n in clips))
 
+    def test_lands_beside_a_box_on_top(self):
+        box("Parcel", (0.25, 0.25, 0.25), (2.0, 0.0, 0.525))   # sits on the step's centre
+        mid = commands.add_move(self.scene, self.leo, start=0, target="Step", jump=True)
+        m = commands.get_move(self.scene, mid)
+        self.z_at(m.start + m.duration + 0.2)
+        p = self.rig.matrix_world.translation
+        self.assertAlmostEqual(p.z, 0.4, places=3)
+        self.assertGreater((p.xy - bpy.data.objects["Parcel"].matrix_world.translation.xy).length, 0.25)
+
     def test_too_high_is_refused(self):
         with self.assertRaises(CSKError) as e:
             commands.add_move(self.scene, self.leo, start=0, target="Wall", jump=True)

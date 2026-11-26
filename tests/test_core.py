@@ -322,5 +322,15 @@ class AgentTests(Base):
         self.assertEqual({a["id"] for a in data["library"]} >= {"walk", "wave", "arms_up"}, True)
 
 
+class CastLookupTests(unittest.TestCase):
+    def test_body_mesh_finds_its_character(self):
+        scene = h.reset_scene()
+        leo = commands.add_starter_character(scene, "Leo")
+        rig = commands.get_cast(scene, leo).object
+        body = [c for c in rig.children if c.type == "MESH"][0]
+        self.assertEqual(commands.cast_for_object(scene, body).id, leo)
+        self.assertIsNone(commands.cast_for_object(scene, None))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -57,8 +57,8 @@ def floor_height(cast):
     return cast.home[2]
 
 
-def ray_hit(scene, depsgraph, origin, direction, ignore=()):
-    """First hit that is not in `ignore`: (location, normal, object) or None."""
+def ray_hit(scene, depsgraph, origin, direction, ignore=(), accept=None):
+    """First hit that is not in `ignore` (and passes `accept`): (location, normal, object)."""
     origin = Vector(origin)
     direction = Vector(direction).normalized()
     for _ in range(MAX_PASSES):
@@ -66,7 +66,7 @@ def ray_hit(scene, depsgraph, origin, direction, ignore=()):
         if not ok:
             return None
         obj = getattr(obj, "original", obj)
-        if obj not in ignore:
+        if obj not in ignore and (accept is None or accept(obj)):
             return loc, normal, obj
         origin = loc + direction * 1e-3
     return None
@@ -84,15 +84,22 @@ def floor_point(origin, direction, z):
     return origin + direction * t
 
 
-def pick(scene, depsgraph, cast, origin, direction):
+def _standable(obj):
+    lab = obj.csk360_label
+    return lab.source == "NONE" or lab.jump_onto or lab.walkable
+
+
+def pick(scene, depsgraph, cast, origin, direction, stand=False):
     """Move target under a viewport ray for `cast`.
 
     Returns {"point": Vector} for the floor, {"target": Object, "arrival": str}
     for a prop, or None when the ray misses everything and points at the sky.
-    Characters (this one and the rest of the cast) are see-through.
+    Characters (this one and the rest of the cast) are see-through. With stand=True
+    (jumping), labelled objects you can't stand on are see-through too.
     """
     z = floor_height(cast)
-    hit = ray_hit(scene, depsgraph, origin, direction, ignore=cast_objects(scene))
+    hit = ray_hit(scene, depsgraph, origin, direction, ignore=cast_objects(scene),
+                  accept=_standable if stand else None)
     if hit is not None:
         loc, normal, obj = hit
         on_floor = normal.z >= FLOOR_NORMAL_Z and abs(loc.z - z) <= FLOOR_TOLERANCE

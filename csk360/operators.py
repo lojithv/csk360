@@ -334,7 +334,8 @@ class CSK360_OT_click_move(bpy.types.Operator):
         origin = view3d_utils.region_2d_to_origin_3d(region, rv3d, (x, y))
         direction = view3d_utils.region_2d_to_vector_3d(region, rv3d, (x, y))
         cast = commands.get_cast(context.scene, self.cast_id)
-        return True, paths.pick(context.scene, context.evaluated_depsgraph_get(), cast, origin, direction)
+        return True, paths.pick(context.scene, context.evaluated_depsgraph_get(), cast, origin,
+                                direction, stand=event.alt)
 
     def _finish(self, context):
         from . import paths
@@ -405,8 +406,8 @@ class CSK360_OT_pick_up(_CSKOperator, bpy.types.Operator):
         others = [o for o in context.selected_objects
                   if commands.cast_for_object(context.scene, o) is None]
         if not others:
-            raise CSKError("Select the object to pick up as well as the character "
-                           "(Ctrl+click it in the viewport).")
+            raise CSKError("Click the object to pick up, then Shift+click the character, "
+                           "so both are selected and the character is active.")
         commands.pick_up(context.scene, cast.id, others[0])
 
 

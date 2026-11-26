@@ -72,11 +72,13 @@ def get_cast(scene, cast_id):
 
 
 def cast_for_object(scene, obj):
-    if obj is None:
-        return None
-    for c in scene.csk360.cast:
-        if c.object == obj:
-            return c
+    """The cast member an object belongs to: the character object itself, or any of its
+    children (clicking a character in the viewport selects its body mesh)."""
+    while obj is not None:
+        for c in scene.csk360.cast:
+            if c.object == obj:
+                return c
+        obj = obj.parent
     return None
 
 

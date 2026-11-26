@@ -280,6 +280,45 @@ JUMP_PEAK = 0.0            # extra arc height; the jump action itself supplies t
 JUMP_DOWN_DIST = 0.55      # horizontal distance covered when jumping down
 
 
+def _landing_spot(scene, target, t):
+    """A free spot on top of `target` at time t: away from things standing on it."""
+    from . import world
+    m = world.measure(target)
+    c, (sx, sy, _sz) = m["center"], m["size"]
+    top = m["top"]
+    others = []
+    for ob in scene.objects:
+        if ob is target or ob.type != "MESH":
+            continue
+        mo = world.measure(ob)
+        if abs(mo["bottom"] - top) < 0.05 and abs(mo["center"][0] - c[0]) < sx / 2 \
+                and abs(mo["center"][1] - c[1]) < sy / 2:
+            others.append(Vector(mo["center"][:2]))
+    for k in scene.csk360.carries:
+        if k.put_object is target and 0.0 <= k.end <= t and k.object is not None:
+            others.append(_put_xy(scene, k))
+    best, best_d = Vector((c[0], c[1])), -1.0
+    if others:
+        for fx in (-0.3, 0.0, 0.3):
+            for fy in (-0.3, 0.0, 0.3):
+                p = Vector((c[0] + fx * sx, c[1] + fy * sy))
+                d = min((p - o).length for o in others)
+                if d > best_d + 1e-6:
+                    best, best_d = p, d
+    return Vector((best.x, best.y, top))
+
+
+def _put_xy(scene, carry):
+    from . import world
+    if carry.put_kind == "OBJECT" and carry.put_object is not None:
+        return Vector(world.measure(carry.put_object)["center"][:2])
+    if carry.put_kind == "POINT":
+        return Vector(carry.put_point[:2])
+    cast = next((c for c in scene.csk360.cast if c.id == carry.cast_id), None)
+    pos, yaw = cast_position(scene, cast, carry.end)
+    return (pos + Vector((math.sin(yaw), -math.cos(yaw), 0.0)) * PUT_FORWARD).xy
+
+
 def _jump_keys(t0, a, b, yaw, keys):
     """Arc from a to b starting at t0; returns landing time."""
     mid = a.lerp(b, 0.5)
@@ -361,10 +400,7 @@ def _compile_moves(scene, cast, moves, warnings):
             pos, yaw = target, new_yaw
             t += dur
         if jump_up:
-            from . import world
-            m = world.measure(move.target_object)
-            c = m["center"]
-            top_pt = Vector((c[0], c[1], m["top"]))
+            top_pt = _landing_spot(scene, move.target_object, t)
             d = top_pt - pos
             d.z = 0.0
             yaw2 = _yaw_towards(d, yaw) if d.length > 1e-4 else yaw

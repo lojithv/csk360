@@ -6,7 +6,7 @@ import unittest
 import bpy
 from mathutils import Vector
 
-from csk360 import commands, compiler, paths
+from csk360 import commands, compiler, paths, world
 
 import helpers as h
 
@@ -47,6 +47,12 @@ class PickTests(unittest.TestCase):
         r = self.pick(2.0, 0.0)
         self.assertIs(r["target"], self.crate)
         self.assertEqual(r["arrival"], "sit")
+
+    def test_jump_picking_sees_through_things_you_cant_stand_on(self):
+        world.detect(self.scene)
+        world.label(self.crate, jump_onto=False, obstacle=True, liftable=True, weight=5)
+        r = paths.pick(self.scene, self.dg, self.cast, Vector((2.0, 0.0, 5.0)), DOWN, stand=True)
+        self.assertIn("point", r)                       # fell through to the floor
 
     def test_characters_are_see_through(self):
         # Straight down through Leo's head lands on the floor, not on Leo.

@@ -45,8 +45,8 @@ objects:
 
 ## Pick up, carry and put down
 
-Select the character, Ctrl+click the object, and press **Pick Up Selected** in the
-Movement panel. If the object is out of reach the character walks over first.
+Click the object, then Shift+click the character (so both are selected and the
+character is active), and press **Pick Up Selected** in the Movement panel. If the object is out of reach the character walks over first.
 CSK360 checks the weight against the character's strength and says why not
 when it's too heavy. While carrying, the character holds the object in front of
 the chest (the *carry* pose plays on the Gesture layer) and it travels with them.
