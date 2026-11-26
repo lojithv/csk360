@@ -177,6 +177,10 @@ class CSK360_PT_moves(_Panel, bpy.types.Panel):
         layout = self.layout
         proj = context.scene.csk360
         row = layout.row(align=True)
+        row.scale_y = 1.4
+        row.operator("csk360.click_move", text="Click to Walk (M)", icon="RESTRICT_SELECT_OFF")
+        row.prop(proj, "show_paths", text="", icon="CURVE_PATH")
+        row = layout.row(align=True)
         row.operator("csk360.add_move", text="Walk to Cursor", icon="PIVOT_CURSOR").to = "CURSOR"
         row.operator("csk360.add_move", text="Walk to Selected", icon="OBJECT_DATA").to = "SELECTED"
         row = layout.row()

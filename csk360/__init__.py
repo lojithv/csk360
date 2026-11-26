@@ -4,10 +4,10 @@
 Scripts and agents should use `commands` (see AGENTS.md in the repository).
 """
 
-from . import (commands, compiler, handlers, keymaps, library, model, operators, render, script,
+from . import (commands, compiler, handlers, keymaps, library, model, operators, paths, render, script,
                starter, ui, voice)
 
-_modules = (model, operators, ui, keymaps, handlers)
+_modules = (model, operators, ui, keymaps, handlers, paths)
 
 
 def register():

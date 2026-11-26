@@ -281,6 +281,115 @@ class CSK360_OT_add_move(_CSKOperator, bpy.types.Operator):
             commands.add_move(scene, cast.id, point=tuple(scene.cursor.location), arrival=self.arrival)
 
 
+def _window_region(area):
+    for region in area.regions:
+        if region.type == "WINDOW":
+            return region
+    return None
+
+
+class CSK360_OT_click_move(bpy.types.Operator):
+    """Click the floor or a prop to walk the character there. Shift+click keeps adding walks"""
+    bl_idname = "csk360.click_move"
+    bl_label = "Click to Walk"
+    bl_options = {"UNDO"}
+
+    STATUS = ("Click the floor or a prop to walk there  ·  Shift+click: add another walk  ·  "
+              "Right-click or Esc: done")
+
+    @classmethod
+    def poll(cls, context):
+        # Strict: only when a character is active, so M falls through to
+        # Blender's own "Move to Collection" for every other object.
+        area = context.area
+        return (area is not None and area.type == "VIEW_3D" and context.mode == "OBJECT"
+                and commands.cast_for_object(context.scene, context.active_object) is not None)
+
+    def invoke(self, context, event):
+        from . import paths
+        self.area = context.area
+        self.region = _window_region(context.area)
+        if self.region is None:
+            return {"CANCELLED"}
+        cast = commands.cast_for_object(context.scene, context.active_object)
+        self.cast_id = cast.id
+        self.added = 0
+        paths.preview.clear()
+        start = cast.object.matrix_world.translation.copy()
+        start.z = paths.floor_height(cast)
+        paths.preview.update({"cast_id": cast.id, "to": None, "from": start})
+        context.workspace.status_text_set(self.STATUS)
+        context.window.cursor_modal_set("CROSSHAIR")
+        context.window_manager.modal_handler_add(self)
+        return {"RUNNING_MODAL"}
+
+    def _pick(self, context, event):
+        from bpy_extras import view3d_utils
+        from . import paths
+        region = self.region
+        x, y = event.mouse_x - region.x, event.mouse_y - region.y
+        if not (0 <= x < region.width and 0 <= y < region.height):
+            return False, None
+        rv3d = self.area.spaces.active.region_3d
+        origin = view3d_utils.region_2d_to_origin_3d(region, rv3d, (x, y))
+        direction = view3d_utils.region_2d_to_vector_3d(region, rv3d, (x, y))
+        cast = commands.get_cast(context.scene, self.cast_id)
+        return True, paths.pick(context.scene, context.evaluated_depsgraph_get(), cast, origin, direction)
+
+    def _finish(self, context):
+        from . import paths
+        paths.preview.clear()
+        context.workspace.status_text_set(None)
+        context.window.cursor_modal_restore()
+        self.area.tag_redraw()
+        return {"FINISHED"} if self.added else {"CANCELLED"}
+
+    def modal(self, context, event):
+        from . import paths
+        if event.type in {"ESC", "RIGHTMOUSE"} and event.value == "PRESS":
+            return self._finish(context)
+        if event.type == "MOUSEMOVE":
+            inside, result = self._pick(context, event)
+            if not inside:
+                return {"PASS_THROUGH"}
+            cast = commands.get_cast(context.scene, self.cast_id)
+            paths.preview["to"] = paths.target_location(result, paths.preview["from"],
+                                                        paths.floor_height(cast))
+            self.area.tag_redraw()
+            return {"RUNNING_MODAL"}
+        if event.type == "LEFTMOUSE" and event.value == "PRESS":
+            inside, result = self._pick(context, event)
+            if not inside:
+                return {"PASS_THROUGH"}
+            if result is None:
+                self.report({"WARNING"}, "Click on the floor or on a prop.")
+                return {"RUNNING_MODAL"}
+            scene = context.scene
+            try:
+                if "point" in result:
+                    commands.add_move(scene, self.cast_id, point=tuple(result["point"]),
+                                      after_previous=self.added > 0)
+                else:
+                    commands.add_move(scene, self.cast_id, target=result["target"],
+                                      arrival=result["arrival"], after_previous=self.added > 0)
+            except CSKError as e:
+                self.report({"ERROR"}, str(e))
+                return self._finish(context)
+            self.added += 1
+            cast = commands.get_cast(scene, self.cast_id)
+            paths.preview["from"] = paths.target_location(result, paths.preview["from"],
+                                                          paths.floor_height(cast))
+            if scene.csk360.last_report:
+                self.report({"WARNING"}, scene.csk360.last_report)
+            if not event.shift:
+                return self._finish(context)
+            return {"RUNNING_MODAL"}
+        if event.type in {"MIDDLEMOUSE", "WHEELUPMOUSE", "WHEELDOWNMOUSE", "TRACKPADPAN",
+                          "TRACKPADZOOM", "NDOF_MOTION"} or event.type.startswith("NUMPAD"):
+            return {"PASS_THROUGH"}  # let the user orbit and zoom while picking
+        return {"RUNNING_MODAL"}
+
+
 class CSK360_OT_remove_move(_CSKOperator, bpy.types.Operator):
     """Remove the active movement"""
     bl_idname = "csk360.remove_move"
@@ -593,6 +702,7 @@ classes = (
     CSK360_OT_split_clip,
     CSK360_OT_jump_clip,
     CSK360_OT_add_move,
+    CSK360_OT_click_move,
     CSK360_OT_remove_move,
     CSK360_OT_add_line,
     CSK360_OT_remove_line,

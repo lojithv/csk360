@@ -212,15 +212,47 @@ def _track_name(layer, sub):
 # Moves
 # ---------------------------------------------------------------------------
 
-def _move_target(move):
+STOP_GAP = 0.3  # metres between a character and the prop it walks up to
+
+
+def approach_point(obj, from_pos):
+    """Where to stop when walking to `obj` from `from_pos`.
+
+    The object's "approach" child when it has one; otherwise the edge of its
+    footprint (world bounding box in XY) facing the walker, plus STOP_GAP, so
+    characters walk up to a crate instead of into it. Objects without size
+    (empties) are walked to directly.
+    """
+    for child in obj.children:
+        if "approach" in child.name.lower():
+            return child.matrix_world.translation.copy()
+    center = obj.matrix_world.translation.copy()
+    corners = [obj.matrix_world @ Vector(c) for c in obj.bound_box]
+    lo = Vector((min(c.x for c in corners), min(c.y for c in corners), 0.0))
+    hi = Vector((max(c.x for c in corners), max(c.y for c in corners), 0.0))
+    if from_pos is None or (hi - lo).length < 0.01:
+        return center
+    d = Vector((from_pos.x - center.x, from_pos.y - center.y, 0.0))
+    if d.length < 1e-6:
+        return center
+    d.normalize()
+    # Distance from the centre to the footprint's edge along d (slab method).
+    t = math.inf
+    for axis in (0, 1):
+        if abs(d[axis]) > 1e-9:
+            edge = hi[axis] if d[axis] > 0 else lo[axis]
+            t = min(t, (edge - center[axis]) / d[axis])
+    if not math.isfinite(t) or t < 0.0:
+        return center
+    return center + d * (t + STOP_GAP)
+
+
+def _move_target(move, from_pos=None):
     if move.target_kind == "OBJECT":
         obj = move.target_object
         if obj is None:
             return None
-        for child in obj.children:
-            if "approach" in child.name.lower():
-                return child.matrix_world.translation.copy()
-        return obj.matrix_world.translation.copy()
+        return approach_point(obj, from_pos)
     return Vector(move.target_point)
 
 
@@ -250,7 +282,7 @@ def _compile_moves(scene, cast, moves, warnings):
     virtual = {"BODY": [], "GESTURE": [], "FACE": []}
     t_free = 0.0
     for move in moves:
-        target = _move_target(move)
+        target = _move_target(move, pos)
         if target is None:
             warnings.append(f"{move.id}: no target object")
             move.duration = 0.0

@@ -27,8 +27,9 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done, `[!]` blocked (reason given)
 - [ ] Save current pose to the library (`Ctrl+Shift+P`)
 
 ### Movement
-- [ ] Click-to-move modal tool (`M`): ray cast to the floor or a prop, Escape cancels
-- [ ] Dashed path and destination handle drawn in the viewport; drag to re-plan
+- [x] Click-to-move modal tool (`M`, only while a character is active, so Blender's "Move to Collection" still works otherwise): floor gives a point, a prop gives the object (walks up to its edge, or to its `approach` child; `csk360_arrival` custom property sets the arrival action); Shift+click chains walks; Esc / right-click ends
+- [x] Dashed path and destination ring drawn in the viewport (Movement panel toggle); live preview while picking
+- [ ] Drag a destination ring to re-plan a walk
 - [ ] Turn-in-place clip for turns over 90°
 
 ### Character life and dialogue
@@ -46,7 +47,7 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done, `[!]` blocked (reason given)
 
 ### Quality
 - [x] Headless draw test of every panel, list, menu and the picker (props, operators and operator properties exist)
-- [ ] Click through every panel and operator in a live Blender 5.3 window (`blender --python tools/dev_load.py` runs the repo copy without installing)
+- [ ] Click through every panel and operator in a live Blender 5.3 window (click-to-move done with `--enable-event-simulate`) (`blender --python tools/dev_load.py` runs the repo copy without installing)
 - [ ] GitHub Actions: download Blender 5.3 and run the headless tests on each push
 - [ ] Golden-frame render tests for key features
 

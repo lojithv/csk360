@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Default shortcuts. `]` / `[` change the active clip by one second,
+"""Default shortcuts. `M` click to walk (character active only), `P` pose pie, `]` / `[` change the active clip by one second,
 with Shift by one frame; Alt+Left / Alt+Right jump between clip boundaries.
 Bound in Object Mode only (Pose mode uses the
 bracket keys for hierarchy selection). Can be switched off in the
@@ -29,6 +29,10 @@ def _add_keymaps():
         kmi.properties.delta = delta
         kmi.properties.by_frames = by_frames
         _keymaps.append((km, kmi))
+    # M only takes over when a CSK360 character is active (the operator's poll
+    # fails otherwise and Blender's "Move to Collection" runs as usual).
+    kmi = km.keymap_items.new("csk360.click_move", "M", "PRESS")
+    _keymaps.append((km, kmi))
     kmi = km.keymap_items.new("wm.call_menu_pie", "P", "PRESS")
     kmi.properties.name = "CSK360_MT_pose_pie"
     _keymaps.append((km, kmi))
@@ -58,7 +62,8 @@ class CSK360_Preferences(bpy.types.AddonPreferences):
 
     use_shortcuts: BoolProperty(
         name="CSK360 Shortcuts",
-        description="In Object Mode: P pose pie, ] and [ lengthen or shorten the active clip "
+        description="In Object Mode with a character active: M click to walk, P pose pie, "
+                    "] and [ lengthen or shorten the active clip "
                     "(Shift: by one frame), Alt+Left/Right jump between clips",
         default=True,
         update=_shortcuts_changed,

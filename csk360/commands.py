@@ -407,10 +407,19 @@ def remove_clip(scene, clip_id):
 # Moves
 # ---------------------------------------------------------------------------
 
+def moves_end(scene, cast_id):
+    """When the cast member's last move finishes (seconds), or None without moves."""
+    ends = [m.start + m.duration for m in scene.csk360.moves if m.cast_id == cast_id]
+    return max(ends) if ends else None
+
+
 def add_move(scene, cast_id, start=None, point=None, target=None, speed=0.0,
-             walk=None, arrival=""):
-    """Walk to `point` (x, y, z) or to `target` (object or object name)."""
+             walk=None, arrival="", after_previous=False):
+    """Walk to `point` (x, y, z) or to `target` (object or object name).
+    `after_previous` starts when the character's last move ends (else at the playhead)."""
     get_cast(scene, cast_id)
+    if after_previous and start is None:
+        start = moves_end(scene, cast_id)
     if (point is None) == (target is None):
         raise CSKError("Give either a point or a target object for the move.")
     if isinstance(target, str):

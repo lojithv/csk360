@@ -7,7 +7,7 @@ CSK360, and for scripts that **use** it inside Blender.
 
 * Blender 5.3 is the only supported version for now; keep code on the slotted-action
   API (`action.slots`, `layers`, `channelbags`). There is no `action.fcurves`.
-* Run `./tools/test.ps1` (headless, ~2 s) after every change; add a test for
+* Run `./tools/test.ps1` (Windows) or `./tools/test.sh` (macOS/Linux) (headless, ~10 s) after every change; add a test for
   every behaviour change. Tests live in `tests/test_*.py` and use fixtures in
   `tests/helpers.py`.
 * Only `compiler.py` writes animation data. UI code calls `operators`, which call
@@ -57,6 +57,7 @@ scene = bpy.context.scene
 leo = commands.add_cast(scene, bpy.data.objects["Leo"])          # -> "leo"
 commands.add_clip(scene, leo, "wave", start=0, duration=2)       # seconds
 commands.add_move(scene, leo, start=0, target="desk_chair", arrival="sit")
+commands.add_move(scene, leo, point=(2, 1, 0), after_previous=True)  # starts when the last walk ends
 commands.add_line(scene, leo, "Morning!", start=6,
                   audio_path="//voice/leo_01.wav",
                   visemes=[(0.0, "B"), (0.12, "C"), (0.4, "X")])

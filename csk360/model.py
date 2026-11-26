@@ -146,6 +146,8 @@ class CSK360_Project(bpy.types.PropertyGroup):
     next_id: IntProperty(description="Counter for new item ids")
     suspend: BoolProperty(description="Internal: skip recompiles during batched edits")
     last_report: StringProperty(description="Warnings from the last rebuild")
+    show_paths: BoolProperty(name="Show Paths", default=True,
+                             description="Draw planned walks in the viewport as dashed lines")
 
 
 classes = (
