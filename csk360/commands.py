@@ -13,7 +13,7 @@ import re
 
 import bpy
 
-from . import compiler, library
+from . import compiler, library, world
 from .model import MOUTH_SHAPES
 
 
@@ -745,7 +745,11 @@ def describe(scene):
     return {
         "fps": compiler.fps(scene),
         "cast": [{"id": c.id, "name": c.name, "object": c.object.name if c.object else None,
-                  "rig_type": c.rig_type, "voice": c.voice} for c in proj.cast],
+                  "rig_type": c.rig_type, "voice": c.voice,
+                  "abilities": {"weight": round(c.weight, 3), "strength": round(c.strength, 3),
+                                "jump_height": round(c.jump_height, 3)}} for c in proj.cast],
+        "objects": {o.name: dict(world.get_label(o)) for o in scene.objects
+                    if o.csk360_label.source != "NONE"},
         "clips": [{"id": c.id, "who": c.cast_id, "asset": c.asset, "layer": c.layer,
                    "start": round(c.start, 4), "duration": round(c.duration, 4),
                    "mode": c.loop_mode} for c in proj.clips],

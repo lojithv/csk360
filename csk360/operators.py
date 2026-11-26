@@ -495,6 +495,49 @@ class CSK360_OT_save_pose(_CSKOperator, bpy.types.Operator):
         self.report({"INFO"}, f"Saved pose '{asset}' to the CSK360 library")
 
 
+class CSK360_OT_detect_labels(_CSKOperator, bpy.types.Operator):
+    """Guess what characters can do with each object (walk on, stand on, lift, weight) from its size"""
+    bl_idname = "csk360.detect_labels"
+    bl_label = "Detect Labels"
+
+    overwrite: BoolProperty(name="Redo Detected and Your Own Labels", default=False)
+
+    def run(self, context):
+        from . import world
+        done = world.detect(context.scene, overwrite=self.overwrite)
+        self.report({"INFO"}, f"Labelled {len(done)} object(s). Check them in CSK360 > Objects.")
+
+
+class CSK360_OT_confirm_label(_CSKOperator, bpy.types.Operator):
+    """Keep the active object's labels as they are (marks them as set by you)"""
+    bl_idname = "csk360.confirm_label"
+    bl_label = "Looks Right"
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.active_object
+        return ob is not None and ob.csk360_label.source == "AUTO"
+
+    def run(self, context):
+        context.active_object.csk360_label.source = "USER"
+
+
+class CSK360_OT_check_ability(bpy.types.Operator):
+    """Check whether the chosen character can lift, or jump onto, the active object"""
+    bl_idname = "csk360.check_ability"
+    bl_label = "Check"
+
+    what: EnumProperty(items=[("LIFT", "Lift", ""), ("JUMP", "Jump Onto", "")])
+    cast_id: StringProperty()
+
+    def execute(self, context):
+        from . import world
+        fn = world.can_lift if self.what == "LIFT" else world.can_jump_onto
+        ok, why = fn(context.scene, self.cast_id, context.active_object)
+        self.report({"INFO"} if ok else {"WARNING"}, why)
+        return {"FINISHED"}
+
+
 class CSK360_OT_mark_asset(_CSKOperator, bpy.types.Operator):
     """Add the active object's current action to the CSK360 library"""
     bl_idname = "csk360.mark_asset"
@@ -745,6 +788,9 @@ classes = (
     CSK360_OT_remove_line,
     CSK360_OT_rebuild,
     CSK360_OT_save_pose,
+    CSK360_OT_detect_labels,
+    CSK360_OT_confirm_label,
+    CSK360_OT_check_ability,
     CSK360_OT_mark_asset,
     CSK360_OT_install_voices,
     CSK360_OT_accept_supertonic_terms,

@@ -115,6 +115,11 @@ class CSK360_PT_cast(_Panel, bpy.types.Panel):
             row.operator("csk360.set_voice", text="", icon="VIEWZOOM")
             box.prop(cast, "speed")
             box.prop(cast, "auto_life")
+            col = box.column(align=True)
+            col.label(text="Abilities", icon="MOD_ARMATURE")
+            col.prop(cast, "weight")
+            col.prop(cast, "strength")
+            col.prop(cast, "jump_height")
             box.operator("csk360.set_home", icon="PIVOT_CURSOR")
         layout.operator("csk360.rebuild", icon="FILE_REFRESH")
         if proj.last_report:
@@ -244,6 +249,47 @@ class CSK360_PT_dialogue(_Panel, bpy.types.Panel):
         col.label(text=f"Mouth: {shapes or 'none yet'}")
 
 
+class CSK360_PT_objects(_Panel, bpy.types.Panel):
+    bl_label = "Objects"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("csk360.detect_labels", icon="VIEWZOOM")
+        ob = context.active_object
+        if ob is None or commands.cast_for_object(context.scene, ob) is not None:
+            layout.label(text="Select an object to label it.", icon="INFO")
+            return
+        lab = ob.csk360_label
+        box = layout.box()
+        src = {"NONE": "Not labelled yet", "AUTO": "Detected: check these",
+               "USER": "Labelled by you"}[lab.source]
+        box.label(text=f"{ob.name}: {src}", icon="OBJECT_DATA")
+        col = box.column(align=True)
+        col.prop(lab, "walkable")
+        col.prop(lab, "jump_onto")
+        col.prop(lab, "obstacle")
+        col.prop(lab, "liftable")
+        sub = col.row()
+        sub.enabled = lab.liftable
+        sub.prop(lab, "weight")
+        if lab.source == "AUTO":
+            box.operator("csk360.confirm_label", icon="CHECKMARK")
+        proj = context.scene.csk360
+        if len(proj.cast) and lab.source != "NONE":
+            col = layout.column(align=True)
+            col.label(text="Can they…?")
+            for c in proj.cast:
+                row = col.row(align=True)
+                row.label(text=c.name)
+                if lab.liftable:
+                    op = row.operator("csk360.check_ability", text="Lift")
+                    op.what, op.cast_id = "LIFT", c.id
+                if lab.jump_onto:
+                    op = row.operator("csk360.check_ability", text="Jump On")
+                    op.what, op.cast_id = "JUMP", c.id
+
+
 class CSK360_PT_voices(_Panel, bpy.types.Panel):
     bl_label = "Voices"
     bl_options = {"DEFAULT_CLOSED"}
@@ -303,6 +349,7 @@ classes = (
     CSK360_PT_clips,
     CSK360_PT_moves,
     CSK360_PT_dialogue,
+    CSK360_PT_objects,
     CSK360_PT_voices,
     CSK360_PT_output,
     CSK360_PT_library,

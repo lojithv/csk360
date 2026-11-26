@@ -54,11 +54,11 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done, `[!]` blocked (reason given)
 ## Phase 1b: world and abilities (requested 2026-11-26, ranked by impact)
 
 Core (in CSK360, because scripts, the compiler and the UI all need it):
-- [ ] More starter poses and actions (point, thinking, hands on hips, shrug, cheer, sad, kneel, lie down, clap, nod, shake head, look around, jump, run, talking hands)
-- [ ] Save your own pose or action to the library (`Ctrl+Shift+P`), plus a how-to in the docs
-- [ ] Object labels: walkable floor, can jump onto, obstacle, liftable, weight (kg), seat; Labels panel for the selected object
-- [ ] Detect labels automatically (floors, surfaces within jump height, small objects as liftable with weight from size); one click to confirm
-- [ ] Character abilities: weight, strength (max lift kg), jump height, walk speed; checks with plain-English reasons ("Leo can lift 25 kg; the fridge is 90 kg")
+- [x] More starter poses and actions (point, thinking, hands on hips, shrug, cheer, sad, kneel, lie down, clap, nod, shake head, look around, jump, run, talking hands)
+- [x] Save your own pose or action to the library (`Ctrl+Shift+P`), plus a how-to in the docs
+- [x] Object labels: walkable floor, can jump onto, obstacle, liftable, weight (kg), seat; Labels panel for the selected object
+- [x] Detect labels automatically (floors, surfaces within jump height, small objects as liftable with weight from size); one click to confirm
+- [x] Character abilities: weight, strength (max lift kg), jump height, walk speed; checks with plain-English reasons ("Leo can lift 25 kg; the fridge is 90 kg")
 - [ ] Pick up / carry / put down an object (hand attachment keyed by the compiler); lift a person when strong enough
 - [ ] Jump onto / off a surface (arc move, uses jump height)
 - [ ] Spawn an object at a time (appears with a pop, or is "made" by a character)

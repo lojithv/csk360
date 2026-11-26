@@ -69,8 +69,36 @@ class CSK360_CastMember(bpy.types.PropertyGroup):
     home_yaw: FloatProperty(name="Start Facing", subtype="ANGLE", update=_changed)
     auto_life: BoolProperty(name="Bring to Life", default=True, update=_changed,
                             description="Blink, idle when no body clip plays, and look at whoever is speaking")
+    weight: FloatProperty(name="Weight (kg)", default=60.0, min=1.0, soft_max=200.0,
+                          description="How heavy this character is when someone lifts them")
+    strength: FloatProperty(name="Can Lift (kg)", default=25.0, min=0.0, soft_max=500.0,
+                            description="The heaviest thing this character can lift alone")
+    jump_height: FloatProperty(name="Jump Height", default=0.5, min=0.0, soft_max=3.0,
+                               subtype="DISTANCE", unit="LENGTH",
+                               description="Highest surface this character can jump onto")
     idle_asset: StringProperty(name="Idle", description="Looping idle action; empty = the library's 'idle'",
                                update=_changed)
+
+
+def _label_edited(self, context):
+    # Editing a detected label by hand makes it yours (detection won't change it again).
+    if self.source != "USER":
+        self.source = "USER"
+
+
+class CSK360_ObjectLabel(bpy.types.PropertyGroup):
+    """What characters can do with an object (Object > csk360_label)."""
+    source: EnumProperty(name="Source", items=[
+        ("NONE", "Not Labelled", ""), ("AUTO", "Detected", "Guessed from size; check it"),
+        ("USER", "Set by You", "")], default="NONE")
+    walkable: BoolProperty(name="Walk On", update=_label_edited, description="A floor characters walk on")
+    jump_onto: BoolProperty(name="Can Stand On", update=_label_edited, description="Characters can jump or climb onto "
+                            "its top if they jump high enough")
+    obstacle: BoolProperty(name="Obstacle", update=_label_edited, description="Characters walk around it, not through it")
+    liftable: BoolProperty(name="Liftable", update=_label_edited, description="Characters can pick it up if strong enough")
+    weight: FloatProperty(name="Weight (kg)", min=0.0, soft_max=500.0, default=0.0,
+                          update=_label_edited,
+                          description="Used for lifting; 0 = unknown")
 
 
 class CSK360_Clip(bpy.types.PropertyGroup):
@@ -151,6 +179,7 @@ class CSK360_Project(bpy.types.PropertyGroup):
 
 
 classes = (
+    CSK360_ObjectLabel,
     CSK360_Viseme,
     CSK360_CastMember,
     CSK360_Clip,
@@ -164,9 +193,11 @@ def register():
     for cls in classes:
         bpy.utils.register_class(cls)
     bpy.types.Scene.csk360 = PointerProperty(type=CSK360_Project)
+    bpy.types.Object.csk360_label = PointerProperty(type=CSK360_ObjectLabel)
 
 
 def unregister():
+    del bpy.types.Object.csk360_label
     del bpy.types.Scene.csk360
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)

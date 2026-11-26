@@ -32,7 +32,12 @@ timeline:
   - {at: 4, who: leo, say: "Morning!"}                 # voiced + lip-synced
   - {after: prev, who: maya, say: "Hi.", gesture: arms_crossed}  # gesture follows the line
 output: {size: 1080p, fps: 24}                         # 1080p, 720p, 4k, 9:16, square
+objects:                                               # optional labels
+  Crate: {liftable: true, weight: 12, jump_onto: true}
 ```
+
+Cast entries also take abilities: `{character: leo, strength: 40, jump: 0.6, weight: 70}`
+(kg, metres, kg).
 
 ```
 blender -b [scene.blend] -P csk360/csk360_build.py -- scene.yaml --validate --json
@@ -64,7 +69,14 @@ commands.add_line(scene, leo, "Morning!", start=6,
 commands.add_line(scene, leo, "Did you see the numbers?", after_previous=True,
                   voice="supertonic/M1", generate=True)   # voiced + lip-synced now
 commands.generate_lines(scene)    # voice every new or edited line (blocking)
-print(commands.describe(scene))   # plain dict: cast, clips, moves, lines, library, warnings
+print(commands.describe(scene))   # plain dict: cast (with abilities), objects (labels), clips, ...
+
+from bl_ext.user_default.csk360 import world
+world.detect(scene)                                   # guess labels for unlabelled meshes
+world.label("Crate", liftable=True, weight=12)        # walkable, jump_onto, obstacle, liftable, weight
+world.set_abilities(scene, leo, strength=40, jump_height=0.6, weight=70)
+ok, why = world.can_lift(scene, leo, "Crate", helpers=["maya"])   # why is plain English
+ok, why = world.can_jump_onto(scene, leo, "Table")
 ```
 
 All functions recompile only the affected character. Unknown asset names raise

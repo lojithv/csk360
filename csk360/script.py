@@ -30,7 +30,7 @@ import re
 
 import bpy
 
-from . import commands, library
+from . import commands, library, world
 from .commands import CSKError
 
 EXPRESSIONS = ("neutral", "happy", "sad", "angry", "surprised", "thinking", "wink", "worried", "confused")
@@ -347,6 +347,10 @@ def validate(script, scene=None):
         cast = {}
     for cid, spec in cast.items():
         spec = spec if isinstance(spec, dict) else {}
+        for k in ("weight", "strength", "jump"):
+            if k in spec and not (isinstance(spec[k], (int, float)) and spec[k] >= 0):
+                errors.append(f"cast {cid}: '{k}' must be a number (kg for weight and strength, "
+                              "metres for jump).")
         v = spec.get("voice")
         if v and "/" not in str(v):
             errors.append(f"cast {cid}: voice '{v}' should look like kokoro/af_heart or supertonic/M1.")
@@ -389,6 +393,22 @@ def validate(script, scene=None):
             errors.append(f"{where}: 'for' must be a positive number of seconds.")
         if "mode" in e and e["mode"] not in ("LOOP", "ONCE", "HOLD", "loop", "once", "hold", "pose"):
             errors.append(f"{where}: mode must be loop, once or pose.")
+    objects = script.get("objects") or {}
+    if not isinstance(objects, dict):
+        errors.append("'objects' must map object names to labels, e.g. Crate: {liftable: true, weight: 12}.")
+        objects = {}
+    from .world import LABEL_FIELDS
+    for name, labels in objects.items():
+        if scene is not None and bpy.data.objects.get(str(name)) is None:
+            errors.append(f"objects: no object named '{name}'."
+                          + _suggest(name, [o.name for o in bpy.data.objects]))
+        if not isinstance(labels, dict):
+            errors.append(f"objects {name}: give labels as a mapping, e.g. {{liftable: true}}.")
+            continue
+        bad = set(labels) - set(LABEL_FIELDS)
+        if bad:
+            errors.append(f"objects {name}: unknown label(s) {', '.join(sorted(bad))}."
+                          + _suggest(sorted(bad)[0], LABEL_FIELDS))
     out = script.get("output") or {}
     if out.get("size") and str(out["size"]) not in SIZES:
         errors.append(f"output size '{out['size']}' unknown. Use one of: {', '.join(SIZES)}.")
@@ -454,6 +474,13 @@ def build(scene, script, voices=True, clear=True):
             commands.get_cast(scene, ids[cid]).voice = spec["voice"]
         if spec.get("speed"):
             commands.get_cast(scene, ids[cid]).speed = float(spec["speed"])
+        abil = {k2: spec[k1] for k1, k2 in (("weight", "weight"), ("strength", "strength"),
+                                             ("jump", "jump_height")) if k1 in spec}
+        if abil:
+            world.set_abilities(scene, ids[cid], **abil)
+
+    for name, labels in (script.get("objects") or {}).items():
+        world.label(str(name), **labels)
 
     prev_end = 0.0
     made = {"clips": [], "moves": [], "lines": []}
