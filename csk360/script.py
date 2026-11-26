@@ -37,7 +37,7 @@ EXPRESSIONS = ("neutral", "happy", "sad", "angry", "surprised", "thinking", "win
 SIZES = {"1080p": (1920, 1080), "720p": (1280, 720), "4k": (3840, 2160),
          "9:16": (1080, 1920), "vertical": (1080, 1920), "square": (1080, 1080)}
 ENTRY_KEYS = {"at", "after", "who", "do", "for", "move_to", "then", "say", "face", "gesture",
-              "voice", "speed", "mode", "layer", "pick_up", "put_down", "helpers", "jump_onto"}
+              "voice", "speed", "mode", "layer", "pick_up", "put_down", "helpers", "jump_onto", "spawn", "place"}
 
 
 class ScriptError(CSKError):
@@ -368,17 +368,21 @@ def validate(script, scene=None):
             errors.append(f"{where}: unknown key(s) {', '.join(sorted(unknown))}."
                           + _suggest(sorted(unknown)[0], ENTRY_KEYS))
         who = e.get("who")
-        if who not in cast:
+        if "spawn" in e and who is None:
+            pass   # objects can appear on their own
+        elif who not in cast:
             errors.append(f"{where}: 'who: {who}' is not in the cast." + _suggest(who, cast))
         if "at" in e and not isinstance(e["at"], (int, float)):
             errors.append(f"{where}: 'at' must be seconds, e.g. at: 6.")
         if "after" in e and e["after"] != "prev":
             errors.append(f"{where}: only 'after: prev' is supported.")
         if not any(k in e for k in ("do", "move_to", "say", "gesture", "face", "pick_up", "put_down",
-                                    "jump_onto")):
+                                    "jump_onto", "spawn")):
             errors.append(f"{where}: nothing to do; use do, move_to, say, gesture, face, "
                           "pick_up or put_down.")
-        for key in ("pick_up", "put_down", "jump_onto"):
+        if "place" in e and not (isinstance(e["place"], list) and len(e["place"]) in (2, 3)):
+            errors.append(f"{where}: place must be [x, y] or [x, y, z].")
+        for key in ("pick_up", "put_down", "jump_onto", "spawn"):
             t = e.get(key)
             if key in e and isinstance(t, str) and t != "front" and scene is not None \
                     and bpy.data.objects.get(t) is None:
@@ -493,6 +497,16 @@ def build(scene, script, voices=True, clear=True):
     prev_end = 0.0
     made = {"clips": [], "moves": [], "lines": []}
     for e in script.get("timeline") or []:
+        if "spawn" in e:
+            maker = ids.get(e.get("who")) if e.get("who") else None
+            at_t = float(e["at"]) if "at" in e else prev_end
+            sid = commands.spawn(scene, str(e["spawn"]), start=at_t, location=e.get("place"),
+                                 by=maker)
+            made.setdefault("spawns", []).append(sid)
+            prev_end = at_t + 0.4
+            if maker is None or not any(k in e for k in ("do", "move_to", "say", "pick_up",
+                                                          "put_down", "jump_onto")):
+                continue
         who = ids[e["who"]]
         start = float(e["at"]) if "at" in e else (None if "say" in e else prev_end)
         end = start or 0.0

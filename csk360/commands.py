@@ -9,6 +9,7 @@ Times are in seconds from the scene's first frame.
 """
 
 import contextlib
+import math
 import re
 
 import bpy
@@ -141,7 +142,8 @@ def _rebuild(scene, cast_ids=(), sounds=False):
             for c in proj.cast:
                 if c.id == cid:
                     warnings += compiler.compile_cast(scene, c)
-        if len(proj.carries) or any(o.get(compiler.HOME_PROP) is not None for o in scene.objects):
+        if len(proj.carries) or len(proj.spawns) or \
+                any(o.get(compiler.HOME_PROP) is not None for o in scene.objects):
             warnings += compiler.compile_objects(scene)
     return _report(scene, warnings)
 
@@ -698,6 +700,93 @@ def remove_carry(scene, carry_id):
 
 
 # ---------------------------------------------------------------------------
+# Spawning
+# ---------------------------------------------------------------------------
+
+SPAWN_FORWARD = 0.7   # metres in front of the maker
+
+
+def spawn(scene, template, start=None, location=None, by=None, copy=True, name=None):
+    """Make an object appear at `start` with a pop.
+
+    copy=True places a new linked copy of `template` (so one "Brick" can become a wall);
+    copy=False makes `template` itself appear where it is. `location` (x, y[, z]) is where
+    the bottom of the object lands; without it, a maker (`by`, a cast id) makes it in
+    front of them, else it appears where the template is. Returns the spawn id."""
+    if isinstance(template, str):
+        found = bpy.data.objects.get(template)
+        if found is None:
+            raise CSKError(f"No object named '{template}' to spawn.")
+        template = found
+    if by:
+        get_cast(scene, by)
+    start = playhead(scene) if start is None else start
+    proj = scene.csk360
+    if not copy and any(sp.object is template for sp in proj.spawns):
+        raise CSKError(f"{template.name} already appears once; use copy=True for more.")
+    obj = template
+    if copy:
+        obj = template.copy()
+        obj.name = name or template.name
+        for col in template.users_collection:
+            col.objects.link(obj)
+        obj.csk360_label.source = template.csk360_label.source
+        for k in world.LABEL_FIELDS:
+            setattr(obj.csk360_label, k, getattr(template.csk360_label, k))
+        for key in (compiler.HOME_PROP,):
+            if key in obj.keys():
+                del obj[key]
+        if obj.animation_data:
+            obj.animation_data_clear()
+        for con in [k for k in obj.constraints if k.name.startswith(compiler.CARRY_CONSTRAINT)]:
+            obj.constraints.remove(con)
+        if template.get(compiler.HOME_PROP) is not None:
+            obj.matrix_world = compiler.object_home(template)
+    if location is None and by:
+        pos, yaw = compiler.cast_position(scene, get_cast(scene, by), start)
+        fwd = Vector((math.sin(yaw), -math.cos(yaw), 0.0))
+        location = tuple(pos + fwd * SPAWN_FORWARD)
+    if location is not None:
+        loc = list(location) + [0.0] * (3 - len(location))
+        bpy.context.view_layer.update()
+        m = world.measure(obj)
+        lift = obj.matrix_world.translation.z - m["bottom"]
+        obj.matrix_world.translation = Vector((loc[0], loc[1], loc[2] + lift))
+    bpy.context.view_layer.update()
+    with batch(scene):
+        sp = proj.spawns.add()
+        sp.id = _new_id(proj, "spawn")
+        sp.object = obj
+        sp.start = start
+        sp.by = by or ""
+        sp.copy = bool(copy)
+        spawn_id = sp.id
+    _rebuild(scene, [by] if by else [])
+    return spawn_id
+
+
+def get_spawn(scene, spawn_id):
+    return _find(scene.csk360.spawns, spawn_id, "spawn")[1]
+
+
+def remove_spawn(scene, spawn_id):
+    """Remove a spawn; a copy CSK360 made is deleted, an original just stays visible."""
+    proj = scene.csk360
+    index, sp = _find(proj.spawns, spawn_id, "spawn")
+    obj, made, by = sp.object, sp.copy, sp.by
+    with batch(scene):
+        proj.spawns.remove(index)
+        if obj is not None:
+            for i in reversed(range(len(proj.carries))):
+                if proj.carries[i].object is obj:
+                    proj.carries.remove(i)
+    if obj is not None and made:
+        compiler.clear_objects(scene)
+        bpy.data.objects.remove(obj)
+    _rebuild(scene, [by] if by else [])
+
+
+# ---------------------------------------------------------------------------
 # Dialogue
 # ---------------------------------------------------------------------------
 
@@ -889,6 +978,9 @@ def describe(scene):
                               else [round(x, 4) for x in m.target_point]),
                    "duration": round(m.duration, 4), "walk": m.walk_asset,
                    "arrival": m.arrival_asset, "jump": m.jump} for m in proj.moves],
+        "spawns": [{"id": sp.id, "object": sp.object.name if sp.object else None,
+                    "start": round(sp.start, 4), "by": sp.by, "copy": sp.copy}
+                   for sp in proj.spawns],
         "carries": [{"id": c.id, "who": c.cast_id, "object": c.object.name if c.object else None,
                      "start": round(c.start, 4), "end": round(c.end, 4), "put": c.put_kind}
                     for c in proj.carries],

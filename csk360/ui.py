@@ -287,6 +287,18 @@ class CSK360_PT_objects(_Panel, bpy.types.Panel):
         sub.prop(lab, "weight")
         if lab.source == "AUTO":
             box.operator("csk360.confirm_label", icon="CHECKMARK")
+        layout.operator("csk360.spawn", icon="ADD")
+        proj = context.scene.csk360
+        if len(proj.spawns):
+            col = layout.column(align=True)
+            col.label(text="Appearing:")
+            for sp in proj.spawns:
+                row = col.row(align=True)
+                who = next((c.name for c in proj.cast if c.id == sp.by), "")
+                name = sp.object.name if sp.object else "?"
+                row.label(text=f"{name} at {sp.start:.1f}s" + (f" by {who}" if who else ""),
+                          icon="OUTLINER_OB_MESH")
+                row.operator("csk360.remove_spawn", text="", icon="X").spawn_id = sp.id
         proj = context.scene.csk360
         if len(proj.cast) and lab.source != "NONE":
             col = layout.column(align=True)

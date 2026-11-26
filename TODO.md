@@ -61,10 +61,11 @@ Core (in CSK360, because scripts, the compiler and the UI all need it):
 - [x] Character abilities: weight, strength (max lift kg), jump height, walk speed; checks with plain-English reasons ("Leo can lift 25 kg; the fridge is 90 kg")
 - [x] Pick up / carry / put down an object (walks over first; carried in front of the chest with a carry pose; put down in front, at a point or on an object)
 - [ ] Lift and carry a person when strong enough (the check exists; animation to do)
-- [ ] Jump onto / off a surface (arc move, uses jump height)
-- [ ] Spawn an object at a time (appears with a pop, or is "made" by a character)
-- [~] Scene-script keys for all of the above (`pick_up`, `put_down` and `helpers` done; `jump_onto`, `spawn` to do) and validation that names the failed ability
-- [ ] Teamwork: two or more characters lift something too heavy for one (combined strength)
+- [x] Jump onto / off a surface (walk to the edge, jump action; refused above jump height; Alt+click in click-to-walk)
+- [x] Spawn an object at a time (pops in; copies of a template; a maker character points while making it)
+- [x] Scene-script keys for all of the above (`pick_up`, `put_down`, `helpers`, `jump_onto`, `spawn` + `place`) and validation that names the failed ability
+- [~] Teamwork: two or more characters lift something too heavy for one (combined-strength check done; shared carry animation to do)
+- [ ] When jumping onto a surface that already has things on it, land beside them
 
 Companion extension `csk360_agents` (separate add-on that drives CSK360's `commands` API):
 - [ ] Builder and agent characters: goals and simple behaviours (fetch, carry, stack, build) planned into CSK360 clips and moves

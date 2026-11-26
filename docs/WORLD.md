@@ -63,4 +63,28 @@ timeline:
   - {at: 6, who: maya, pick_up: Crate, helpers: [leo]}   # strengths add up for the check
 ```
 
-Jumping onto surfaces and spawning objects come next (see TODO.md).
+## Jump onto things
+
+In click-to-walk (**M**), **Alt+click** a surface to walk up to it and jump on.
+CSK360 checks the top's height against the character's **Jump Height** and says
+why not if it's too high. Walking somewhere lower afterwards jumps down first.
+In scripts: `{at: 3, who: maya, jump_onto: Step, then: cheer}`.
+
+## Make things appear (spawn)
+
+Select an object and press **Make It Appear** in the Objects panel. A copy (or the
+object itself) pops in at the playhead, at the 3D cursor, where it is, or in front
+of the character who makes it (that character points while making it). One
+template object can become a whole wall:
+
+![Building a wall](build_example.png)
+
+```yaml
+timeline:
+  - {at: 0.5, who: leo, spawn: Brick, place: [-1.0, 0.5]}
+  - {at: 0.9, who: leo, spawn: Brick, place: [-0.58, 0.5]}
+  - {at: 2,  spawn: Lamp}                     # nobody makes it; it just appears
+```
+
+Spawned copies keep their labels, so characters can pick them up and carry them.
+See `examples/build_wall.py` for the scene above, written in Python.

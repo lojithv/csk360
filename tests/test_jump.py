@@ -38,7 +38,11 @@ class JumpTests(unittest.TestCase):
         m = commands.get_move(self.scene, mid)
         end = m.start + m.duration
         self.assertAlmostEqual(self.z_at(end + 0.2), 0.4, places=3)
-        self.assertGreater(max(self.z_at(end - k * 0.05) for k in range(1, 10)), 0.5)  # arc peak
+        hops = []
+        for k in range(1, 12):
+            self.z_at(end - k * 0.05)
+            hops.append(self.rig.pose.bones["hips"].location.y)
+        self.assertGreater(max(hops), 0.2)          # the jump action hops during the rise
         self.z_at(end + 0.2)
         x = self.rig.matrix_world.translation.x
         self.assertAlmostEqual(x, 2.0, places=2)                 # middle of the top

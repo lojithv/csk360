@@ -601,6 +601,55 @@ class CSK360_OT_check_ability(bpy.types.Operator):
         return {"FINISHED"}
 
 
+def _maker_items(self, context):
+    items = [("NONE", "Nobody", "It just appears")]
+    items += [(c.id, c.name, f"{c.name} makes it, in front of them")
+              for c in context.scene.csk360.cast]
+    return items
+
+
+class CSK360_OT_spawn(_CSKOperator, bpy.types.Operator):
+    """Make the active object (or a copy of it) appear at the playhead, with a pop"""
+    bl_idname = "csk360.spawn"
+    bl_label = "Make It Appear"
+
+    copy: BoolProperty(name="Make a Copy", default=True,
+                       description="Place a new copy; off makes this object itself appear")
+    where: EnumProperty(name="Where", items=[
+        ("CURSOR", "At 3D Cursor", ""), ("IN_PLACE", "Where It Is", ""),
+        ("MAKER", "In Front of the Maker", "")], default="CURSOR")
+    by: EnumProperty(name="Made By", items=_maker_items)
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.active_object
+        return ob is not None and commands.cast_for_object(context.scene, ob) is None
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def run(self, context):
+        scene = context.scene
+        by = None if self.by == "NONE" else self.by
+        loc = None
+        if self.where == "CURSOR":
+            loc = tuple(scene.cursor.location)
+        elif self.where == "MAKER" and by is None:
+            raise CSKError("Choose who makes it, or another place.")
+        commands.spawn(scene, context.active_object, location=loc, by=by, copy=self.copy)
+
+
+class CSK360_OT_remove_spawn(_CSKOperator, bpy.types.Operator):
+    """Remove this appearance (a copy CSK360 made is deleted)"""
+    bl_idname = "csk360.remove_spawn"
+    bl_label = "Remove"
+
+    spawn_id: StringProperty()
+
+    def run(self, context):
+        commands.remove_spawn(context.scene, self.spawn_id)
+
+
 class CSK360_OT_mark_asset(_CSKOperator, bpy.types.Operator):
     """Add the active object's current action to the CSK360 library"""
     bl_idname = "csk360.mark_asset"
@@ -855,6 +904,8 @@ classes = (
     CSK360_OT_rebuild,
     CSK360_OT_save_pose,
     CSK360_OT_detect_labels,
+    CSK360_OT_spawn,
+    CSK360_OT_remove_spawn,
     CSK360_OT_confirm_label,
     CSK360_OT_check_ability,
     CSK360_OT_mark_asset,

@@ -610,6 +610,7 @@ def compile_cast(scene, cast):
         specs.extend(virtual[layer])
         if layer == "GESTURE":
             specs.extend(_carry_gesture_specs(scene, cast))
+            specs.extend(_spawn_gesture_specs(scene, cast))
         if layer == "BODY" and cast.auto_life:
             specs.extend(_idle_specs(scene, cast, specs))
         if not specs:
@@ -671,6 +672,8 @@ CARRY_FORWARD = 0.32      # metres in front of the chest
 CARRY_HEIGHT = 0.95       # metres above the feet (object centre)
 PUT_FORWARD = 0.6         # put down this far in front of the character
 HOME_PROP = "csk360_home"
+SPAWN_POP = 0.3           # seconds an object takes to pop into place
+SPAWN_LEAD = 0.4          # the maker starts gesturing this long before
 OBJECT_ACTION_PREFIX = library.GENERATED_PREFIX + "obj."
 
 
@@ -757,6 +760,16 @@ def _carry_gesture_specs(scene, cast):
     return specs
 
 
+def _spawn_gesture_specs(scene, cast):
+    act = library.resolve("point")
+    if act is None:
+        return []
+    return [{"name": f"{sp.id}.make", "action": act, "start": max(sp.start - SPAWN_LEAD, 0.0),
+             "duration": SPAWN_LEAD + SPAWN_POP + 0.4, "loop_mode": "HOLD",
+             "blend_in": 0.2, "blend_out": 0.2}
+            for sp in scene.csk360.spawns if sp.by == cast.id and sp.object is not None]
+
+
 def _scene_seconds(scene):
     return max((scene.frame_end - scene.frame_start) / fps(scene), 0.0)
 
@@ -791,8 +804,14 @@ def compile_objects(scene):
             warnings.append(f"{c.id}: no object to carry")
             continue
         by_obj.setdefault(c.object, []).append(c)
+    spawns = {}
+    for sp in scene.csk360.spawns:
+        if sp.object is None:
+            warnings.append(f"{sp.id}: its object was deleted")
+            continue
+        spawns[sp.object] = sp
+        by_obj.setdefault(sp.object, [])
     clear_objects(scene, keep=set(by_obj))
-    rate = fps(scene)
     for obj, carries in by_obj.items():
         carries.sort(key=lambda c: c.start)
         home = object_home(obj)
@@ -821,6 +840,15 @@ def compile_objects(scene):
         f0 = scene.frame_start
         key_basis(f0, home)
         state = home
+        sp = spawns.get(obj)
+        if sp is not None:
+            fs = to_frame(scene, sp.start)
+            fe = to_frame(scene, sp.start + SPAWN_POP)
+            hs = home.to_scale()
+            for i in range(3):
+                _key(scl[i], f0, 0.0, "CONSTANT")
+                _key(scl[i], fs, 0.0, "BEZIER")
+                _key(scl[i], fe, hs[i], "CONSTANT")
         for c in carries:
             cast = next((m for m in scene.csk360.cast if m.id == c.cast_id), None)
             if cast is None or cast.object is None:

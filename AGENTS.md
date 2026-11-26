@@ -45,7 +45,8 @@ blender -b [scene.blend] -P csk360/csk360_build.py -- scene.yaml --save out.blen
 ```
 
 Entry keys: at, after (prev), who, do, for, mode (loop/once/pose), layer, move_to,
-then, say, voice, gesture, face, pick_up, put_down (object, [x, y] or front), helpers. Starter assets: idle, walk, wave, arms_crossed, sit.
+then, say, voice, gesture, face, pick_up, put_down (object, [x, y] or front), helpers,
+jump_onto, spawn (+ place: [x, y]; who is optional for spawn). Starter assets: idle, walk, wave, arms_crossed, sit.
 Validation errors name the entry and suggest the closest valid id; fix the text and rebuild.
 Frameling screenplays (`Name (expression, action): text`, `.txt`) also work.
 
@@ -79,6 +80,8 @@ ok, why = world.can_lift(scene, leo, "Crate", helpers=["maya"])   # why is plain
 ok, why = world.can_jump_onto(scene, leo, "Table")
 commands.pick_up(scene, leo, "Crate", start=2)        # walks over first; CSKError says why if too heavy
 commands.put_down(scene, leo, at="Table", start=6)    # at=None (in front), (x, y) or an object
+commands.add_move(scene, leo, target="Step", jump=True)   # jump onto; CSKError if too high
+commands.spawn(scene, "Brick", start=1, location=(0, 1, 0), by=leo)   # a copy pops in; leo points
 ```
 
 All functions recompile only the affected character. Unknown asset names raise

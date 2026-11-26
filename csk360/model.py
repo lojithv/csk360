@@ -158,6 +158,16 @@ class CSK360_Carry(bpy.types.PropertyGroup):
     put_object: PointerProperty(name="On", type=bpy.types.Object, update=_changed)
 
 
+class CSK360_Spawn(bpy.types.PropertyGroup):
+    """An object appears at `start` (with a pop), optionally made by a character."""
+    id: StringProperty(name="ID")
+    object: PointerProperty(name="Object", type=bpy.types.Object, update=_changed)
+    start: FloatProperty(name="Appears At", min=0.0, unit="TIME_ABSOLUTE", update=_changed)
+    by: StringProperty(name="Made By", description="Cast id of the character who makes it")
+    copy: BoolProperty(name="Is a Copy", description="CSK360 made this object; removing the "
+                       "spawn deletes it")
+
+
 class CSK360_DialogueLine(bpy.types.PropertyGroup):
     id: StringProperty(name="ID")
     cast_id: StringProperty(name="Speaker")
@@ -184,6 +194,7 @@ class CSK360_Project(bpy.types.PropertyGroup):
     moves: CollectionProperty(type=CSK360_Move)
     lines: CollectionProperty(type=CSK360_DialogueLine)
     carries: CollectionProperty(type=CSK360_Carry)
+    spawns: CollectionProperty(type=CSK360_Spawn)
 
     active_cast_index: IntProperty()
     active_clip_index: IntProperty()
@@ -204,6 +215,7 @@ classes = (
     CSK360_Clip,
     CSK360_Move,
     CSK360_Carry,
+    CSK360_Spawn,
     CSK360_DialogueLine,
     CSK360_Project,
 )
