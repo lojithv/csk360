@@ -328,17 +328,182 @@ def _sit():
     }
 
 
+def _sym(base, axis, value_l, frames=None, mirror_sign=-1):
+    """Same rotation on both sides; Y/Z rotations flip sign on the right side."""
+    frames = frames or {1: None}
+    out = {}
+    for side, sign in (("L", 1), ("R", mirror_sign if axis in (1, 2) else 1)):
+        out[(_rot(f"{base}_{side}"), axis)] = {f: (value_l if v is None else v) * sign
+                                               for f, v in frames.items()}
+    return out
+
+
+def _point():
+    return {
+        (_rot("upper_arm_R"), 0): {1: -85},
+        (_rot("forearm_R"), 0): {1: -5},
+        (_rot("head"), 2): {1: -8},
+    }
+
+
+def _thinking():
+    return {
+        (_rot("upper_arm_R"), 0): {1: -45},
+        (_rot("upper_arm_R"), 2): {1: -20},
+        (_rot("forearm_R"), 0): {1: -150},
+        (_rot("upper_arm_L"), 0): {1: -20},
+        (_rot("upper_arm_L"), 2): {1: 25},
+        (_rot("forearm_L"), 0): {1: -85},
+        (_rot("head"), 0): {1: 8},
+        (_rot("head"), 1): {1: 10},
+    }
+
+
+def _hands_on_hips():
+    ch = _sym("upper_arm", 2, -40)
+    ch.update(_sym("forearm", 2, 95))
+    ch.update(_sym("forearm", 0, -10))
+    return ch
+
+
+def _cheer():
+    ch = _sym("upper_arm", 0, -165)
+    ch.update(_sym("upper_arm", 2, 25))   # arm raised: +Z on the left swings it outward
+    ch.update(_sym("forearm", 0, -10))
+    ch[(_rot("head"), 0)] = {1: -10}
+    return ch
+
+
+def _sad():
+    return {
+        (_rot("chest"), 0): {1: 12},
+        (_rot("neck"), 0): {1: 10},
+        (_rot("head"), 0): {1: 10},
+        (_rot("upper_arm_L"), 0): {1: -8},
+        (_rot("upper_arm_R"), 0): {1: -8},
+    }
+
+
+def _shrug():
+    ch = _sym("upper_arm", 2, -12, {1: 0, 6: None, 20: None, 26: 0})
+    ch.update(_sym("forearm", 0, -80, {1: 0, 6: None, 20: None, 26: 0}))
+    ch.update(_sym("forearm", 2, -45, {1: 0, 6: None, 20: None, 26: 0}))
+    ch[(_rot("head"), 1)] = {1: 0, 6: 10, 20: 10, 26: 0}
+    return ch
+
+
+def _clap():
+    ch = _sym("upper_arm", 0, -45)
+    ch.update(_sym("forearm", 0, -55))
+    ch.update(_sym("upper_arm", 2, 18, {1: 0, 5: 18, 9: 0, 13: 18, 17: 0}))
+    return ch
+
+
+def _nod():
+    return {(_rot("head"), 0): {1: 0, 7: 14, 13: 0, 19: 14, 25: 0}}
+
+
+def _shake_head():
+    return {(_rot("head"), 2): {1: 0, 6: 18, 12: -18, 18: 18, 24: -18, 30: 0}}
+
+
+def _look_around():
+    return {(_rot("head"), 2): {1: 0, 15: 40, 35: 40, 55: -40, 75: -40, 90: 0},
+            (_rot("chest"), 2): {1: 0, 15: 8, 35: 8, 55: -8, 75: -8, 90: 0}}
+
+
+def _talk_hands():
+    ch = _sym("upper_arm", 0, -20)
+    ch.update(_sym("forearm", 0, -70, {1: -70, 13: -55, 25: -70, 37: -60, 49: -70}))
+    ch.update(_sym("forearm", 2, -20, {1: -10, 13: -30, 25: -10, 37: -25, 49: -10}))
+    return ch
+
+
+def _kneel():
+    return {
+        (_loc("hips"), 1): {1: -0.33},
+        (_rot("thigh_L"), 0): {1: -90},
+        (_rot("shin_L"), 0): {1: 90},
+        (_rot("thigh_R"), 0): {1: 5},
+        (_rot("shin_R"), 0): {1: 95},
+        (_rot("foot_R"), 0): {1: -40},
+    }
+
+
+def _lie_down():
+    return {
+        (_loc("hips"), 1): {1: -0.6},
+        (_rot("hips"), 0): {1: -90},
+        (_rot("upper_arm_L"), 2): {1: -10},
+        (_rot("upper_arm_R"), 2): {1: 10},
+    }
+
+
+def _jump():
+    ch = {(_loc("hips"), 1): {1: 0, 6: -0.15, 11: 0.35, 15: 0.38, 20: 0, 24: -0.08, 28: 0}}
+    ch.update(_sym("thigh", 0, -40, {1: 0, 6: -40, 11: -5, 15: -10, 20: -30, 24: -30, 28: 0}))
+    ch.update(_sym("shin", 0, 70, {1: 0, 6: 70, 11: 10, 15: 20, 20: 50, 24: 50, 28: 0}))
+    ch.update(_sym("upper_arm", 0, 30, {1: 0, 6: 30, 11: -150, 15: -150, 20: -20, 28: 0}))
+    return ch
+
+
+def _run():
+    ch = {}
+    for side, phase in (("L", 1), ("R", -1)):
+        ch[(_rot(f"thigh_{side}"), 0)] = {1: -45 * phase, 9: 35 * phase, 17: -45 * phase}
+        ch[(_rot(f"upper_arm_{side}"), 0)] = {1: 40 * phase, 9: -40 * phase, 17: 40 * phase}
+        ch[(_rot(f"forearm_{side}"), 0)] = {1: -80, 17: -80}
+    ch[(_rot("shin_L"), 0)] = {1: 20, 9: 20, 13: 90, 17: 20}
+    ch[(_rot("shin_R"), 0)] = {1: 20, 5: 90, 9: 20, 17: 20}
+    ch[(_rot("chest"), 0)] = {1: -10, 17: -10}
+    ch[(_loc("hips"), 1)] = {1: 0.0, 5: 0.06, 9: 0.0, 13: 0.06, 17: 0.0}
+    return ch
+
+
 STARTER_ASSETS = {
-    "idle": (_idle, dict(kind="action", layer="BODY", loop=True, duration=4.0, favorite=True,
+    # Standing and motion
+    "idle": (_idle, dict(kind="action", layer="BODY", loop=True, duration=4.0,
                          category="Standing", tags="idle, stand, wait")),
-    "walk": (_walk, dict(kind="action", layer="BODY", loop=True, stride=0.35, favorite=True,
+    "walk": (_walk, dict(kind="action", layer="BODY", loop=True, stride=0.35,
                          category="Motion keys", tags="walk, move")),
+    "run": (_run, dict(kind="action", layer="BODY", loop=True, stride=0.75,
+                       category="Motion keys", tags="run, jog, hurry, move")),
+    "jump": (_jump, dict(kind="action", layer="BODY", favorite=True,
+                         category="Motion keys", tags="jump, hop, leap")),
+    "sad": (_sad, dict(kind="pose", layer="GESTURE", duration=3.0,
+                       category="Standing", tags="sad, down, slump, tired")),
+    "hands_on_hips": (_hands_on_hips, dict(kind="pose", layer="GESTURE", duration=3.0,
+                                           category="Standing", tags="hips, confident, waiting")),
+    # Gestures
     "wave": (_wave, dict(kind="action", layer="GESTURE", category="Gestures", favorite=True,
                          tags="wave, hello, bye")),
+    "point": (_point, dict(kind="pose", layer="GESTURE", duration=2.0, favorite=True,
+                           category="Gestures", tags="point, there, look, show")),
+    "thinking": (_thinking, dict(kind="pose", layer="GESTURE", duration=3.0, favorite=True,
+                                 category="Gestures", tags="think, chin, hmm, wonder")),
+    "cheer": (_cheer, dict(kind="pose", layer="GESTURE", duration=2.0, favorite=True,
+                           category="Gestures", tags="cheer, celebrate, yay, win, arms up")),
     "arms_crossed": (_arms_crossed, dict(kind="pose", layer="GESTURE", duration=3.0, favorite=True,
                                          category="Gestures", tags="arms, cross, wait, annoyed")),
+    "shrug": (_shrug, dict(kind="action", layer="GESTURE", category="Gestures",
+                           tags="shrug, dunno, whatever")),
+    "clap": (_clap, dict(kind="action", layer="GESTURE", loop=True, duration=2.0,
+                         category="Gestures", tags="clap, applause, well done")),
+    "nod": (_nod, dict(kind="action", layer="GESTURE", category="Gestures",
+                       tags="nod, yes, agree")),
+    "shake_head": (_shake_head, dict(kind="action", layer="GESTURE", category="Gestures",
+                                     tags="shake, no, disagree")),
+    "look_around": (_look_around, dict(kind="action", layer="GESTURE", category="Gestures",
+                                       tags="look, search, around, lost")),
+    "talk_hands": (_talk_hands, dict(kind="action", layer="GESTURE", loop=True, duration=3.0,
+                                     category="Gestures", tags="talk, explain, hands, speak")),
+    # Sitting, kneeling, lying
     "sit": (_sit, dict(kind="pose", layer="BODY", duration=3.0, favorite=True,
                        category="Sitting and kneeling", tags="sit, seat, chair")),
+    "kneel": (_kneel, dict(kind="pose", layer="BODY", duration=3.0,
+                           category="Sitting and kneeling", tags="kneel, knee, propose, low")),
+    "lie_down": (_lie_down, dict(kind="pose", layer="BODY", duration=3.0,
+                                 category="Lying", tags="lie, sleep, rest, floor")),
 }
 
 

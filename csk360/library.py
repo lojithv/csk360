@@ -28,7 +28,7 @@ DEFAULT_META = {
 }
 
 # Picker category chips, as in Frameling.
-CATEGORIES = ("Standing", "Gestures", "Sitting and kneeling", "Lying", "Motion keys")
+CATEGORIES = ("Standing", "Gestures", "Sitting and kneeling", "Lying", "Motion keys", "My poses")
 
 
 def fps(scene=None):

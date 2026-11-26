@@ -133,7 +133,9 @@ class CSK360_PT_clips(_Panel, bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         proj = context.scene.csk360
-        layout.operator("csk360.pose_picker", text="Pick Pose or Action…", icon="ARMATURE_DATA")
+        row = layout.row(align=True)
+        row.operator("csk360.pose_picker", text="Pick Pose or Action…", icon="ARMATURE_DATA")
+        row.operator("csk360.save_pose", text="", icon="ADD")
         row = layout.row()
         row.template_list("CSK360_UL_clips", "", proj, "clips", proj, "active_clip_index", rows=4)
         col = row.column(align=True)
@@ -275,6 +277,7 @@ class CSK360_PT_library(_Panel, bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
+        layout.operator("csk360.save_pose", icon="ARMATURE_DATA")
         layout.operator("csk360.mark_asset", icon="ASSET_MANAGER")
         assets = library.search(marked_only=True)
         if not assets:

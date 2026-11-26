@@ -36,6 +36,10 @@ def _add_keymaps():
     kmi = km.keymap_items.new("wm.call_menu_pie", "P", "PRESS")
     kmi.properties.name = "CSK360_MT_pose_pie"
     _keymaps.append((km, kmi))
+    for km_name in ("Object Mode", "Pose"):
+        km2 = kc.keymaps.new(name=km_name, space_type="EMPTY")
+        kmi = km2.keymap_items.new("csk360.save_pose", "P", "PRESS", ctrl=True, shift=True)
+        _keymaps.append((km2, kmi))
     for key, direction in (("RIGHT_ARROW", "NEXT"), ("LEFT_ARROW", "PREV")):
         kmi = km.keymap_items.new("csk360.jump_clip", key, "PRESS", alt=True)
         kmi.properties.direction = direction
@@ -63,6 +67,7 @@ class CSK360_Preferences(bpy.types.AddonPreferences):
     use_shortcuts: BoolProperty(
         name="CSK360 Shortcuts",
         description="In Object Mode with a character active: M click to walk, P pose pie, "
+                    "Ctrl+Shift+P save the current pose (also in Pose Mode), "
                     "] and [ lengthen or shorten the active clip "
                     "(Shift: by one frame), Alt+Left/Right jump between clips",
         default=True,

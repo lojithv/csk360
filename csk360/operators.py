@@ -458,6 +458,43 @@ class CSK360_OT_rebuild(_CSKOperator, bpy.types.Operator):
         commands.rebuild(context.scene)
 
 
+class CSK360_OT_save_pose(_CSKOperator, bpy.types.Operator):
+    """Save the character's current pose to the library, to reuse on any character (Ctrl+Shift+P)"""
+    bl_idname = "csk360.save_pose"
+    bl_label = "Save Pose to Library"
+
+    name: StringProperty(name="Name", default="My Pose")
+    category: EnumProperty(name="Category", items=[(c, c, "") for c in library.CATEGORIES],
+                           default="My poses")
+    layer: EnumProperty(name="Layer", items=[
+        ("AUTO", "Automatic", "Gesture if only the upper body moved, else Body"),
+        ("BODY", "Body", "Whole body; replaces walks and sits while it plays"),
+        ("GESTURE", "Gesture", "Upper body; layers over the body clip"),
+    ], default="AUTO")
+    favorite: BoolProperty(name="Show in Pie Menu (P)", default=True)
+    add_clip: BoolProperty(name="Add as Clip at Playhead", default=True)
+    overwrite: BoolProperty(name="Overwrite if the Name Exists", default=False)
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.active_object
+        return (ob is not None and ob.type == "ARMATURE"
+                and commands.cast_for_object(context.scene, ob) is not None)
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def run(self, context):
+        scene = context.scene
+        cast = commands.cast_for_object(scene, context.active_object)
+        asset = commands.save_pose(scene, cast.id, self.name, category=self.category,
+                                   layer=self.layer, favorite=self.favorite,
+                                   overwrite=self.overwrite)
+        if self.add_clip:
+            commands.add_clip(scene, cast.id, asset)
+        self.report({"INFO"}, f"Saved pose '{asset}' to the CSK360 library")
+
+
 class CSK360_OT_mark_asset(_CSKOperator, bpy.types.Operator):
     """Add the active object's current action to the CSK360 library"""
     bl_idname = "csk360.mark_asset"
@@ -707,6 +744,7 @@ classes = (
     CSK360_OT_add_line,
     CSK360_OT_remove_line,
     CSK360_OT_rebuild,
+    CSK360_OT_save_pose,
     CSK360_OT_mark_asset,
     CSK360_OT_install_voices,
     CSK360_OT_accept_supertonic_terms,

@@ -404,6 +404,87 @@ def remove_clip(scene, clip_id):
 
 
 # ---------------------------------------------------------------------------
+# Your own poses
+# ---------------------------------------------------------------------------
+
+LOWER_BODY_WORDS = ("root", "hips", "pelvis", "thigh", "shin", "calf", "leg", "foot", "toe")
+
+
+def _is_lower_body(bone_name):
+    n = bone_name.lower()
+    return any(w in n for w in LOWER_BODY_WORDS)
+
+
+def save_pose(scene, cast_id, name, category="", layer="AUTO", favorite=False, tags="",
+              overwrite=False):
+    """Save the character's current pose (as seen in the viewport) as a library pose.
+
+    Only bones moved away from their rest pose are keyed. layer="AUTO" picks
+    GESTURE when only the upper body moved (so it layers over walks and sits),
+    else BODY. Returns the new asset id. Poses work on every character whose
+    bones have the same names (all starter characters share them)."""
+    import math
+
+    cast = get_cast(scene, cast_id)
+    obj = cast.object
+    if obj is None or obj.type != "ARMATURE":
+        raise CSKError(f"{cast.name} has no armature to take a pose from.")
+    if not name or not name.strip():
+        raise CSKError("Give the pose a name.")
+    asset_id = _slug(name)
+    existing = bpy.data.actions.get(asset_id)
+    if existing is not None:
+        if not overwrite:
+            raise CSKError(f"A pose or action named '{asset_id}' already exists. "
+                           "Choose another name or overwrite it.")
+        bpy.data.actions.remove(existing)
+    channels = []   # (data path, index, value)
+    moved = set()
+    eps = 1e-4
+    for pb in obj.pose.bones:
+        base = f'pose.bones["{pb.name}"]'
+        for i, v in enumerate(pb.location):
+            if abs(v) > eps:
+                channels.append((base + ".location", i, v))
+                moved.add(pb.name)
+        if pb.rotation_mode == "QUATERNION":
+            q = pb.rotation_quaternion
+            if abs(q[0] - 1.0) > eps or any(abs(c) > eps for c in q[1:]):
+                for i, v in enumerate(q):
+                    channels.append((base + ".rotation_quaternion", i, v))
+                moved.add(pb.name)
+        elif pb.rotation_mode == "AXIS_ANGLE":
+            aa = pb.rotation_axis_angle
+            if abs(aa[0]) > eps:
+                for i, v in enumerate(aa):
+                    channels.append((base + ".rotation_axis_angle", i, v))
+                moved.add(pb.name)
+        else:
+            for i, v in enumerate(pb.rotation_euler):
+                if abs(math.remainder(v, math.tau)) > eps:
+                    channels.append((base + ".rotation_euler", i, v))
+                    moved.add(pb.name)
+        for i, v in enumerate(pb.scale):
+            if abs(v - 1.0) > eps:
+                channels.append((base + ".scale", i, v))
+                moved.add(pb.name)
+    if not channels:
+        raise CSKError(f"{cast.name} is in the rest pose. Pose the character first "
+                       "(Pose Mode: rotate bones with R), then save.")
+    if layer == "AUTO":
+        layer = "BODY" if any(_is_lower_body(b) for b in moved) else "GESTURE"
+    action = bpy.data.actions.new(asset_id)
+    slot = action.slots.new(id_type="OBJECT", name="Character")
+    cb = action.layers.new("Layer").strips.new(type="KEYFRAME").channelbags.new(slot)
+    for path, index, value in channels:
+        fc = cb.fcurves.new(path, index=index)
+        fc.keyframe_points.insert(1, value)
+    library.mark(action, kind="pose", layer=layer, duration=2.0, favorite=bool(favorite),
+                 category=category or "My poses", tags=tags)
+    return action.name
+
+
+# ---------------------------------------------------------------------------
 # Moves
 # ---------------------------------------------------------------------------
 

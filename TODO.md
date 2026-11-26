@@ -51,6 +51,26 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done, `[!]` blocked (reason given)
 - [ ] GitHub Actions: download Blender 5.3 and run the headless tests on each push
 - [ ] Golden-frame render tests for key features
 
+## Phase 1b: world and abilities (requested 2026-11-26, ranked by impact)
+
+Core (in CSK360, because scripts, the compiler and the UI all need it):
+- [ ] More starter poses and actions (point, thinking, hands on hips, shrug, cheer, sad, kneel, lie down, clap, nod, shake head, look around, jump, run, talking hands)
+- [ ] Save your own pose or action to the library (`Ctrl+Shift+P`), plus a how-to in the docs
+- [ ] Object labels: walkable floor, can jump onto, obstacle, liftable, weight (kg), seat; Labels panel for the selected object
+- [ ] Detect labels automatically (floors, surfaces within jump height, small objects as liftable with weight from size); one click to confirm
+- [ ] Character abilities: weight, strength (max lift kg), jump height, walk speed; checks with plain-English reasons ("Leo can lift 25 kg; the fridge is 90 kg")
+- [ ] Pick up / carry / put down an object (hand attachment keyed by the compiler); lift a person when strong enough
+- [ ] Jump onto / off a surface (arc move, uses jump height)
+- [ ] Spawn an object at a time (appears with a pop, or is "made" by a character)
+- [ ] Scene-script keys for all of the above (`pick_up`, `put_down`, `jump_onto`, `spawn`) and validation that names the failed ability
+- [ ] Teamwork: two or more characters lift something too heavy for one (combined strength)
+
+Companion extension `csk360_agents` (separate add-on that drives CSK360's `commands` API):
+- [ ] Builder and agent characters: goals and simple behaviours (fetch, carry, stack, build) planned into CSK360 clips and moves
+- [ ] Build recipes: walls, towers, simple houses from blocks; several builders share the work
+- [ ] Characters change the environment: place, move and remove objects over time
+- [ ] Scripted agents for automated tasks in Blender (rule-based first; LLM/MCP-driven later via the MCP server)
+
 ## Phase 2+ (from the design doc)
 
 - [ ] Interaction points on props (`seat`, `approach`, `hand_L/R`); Sit on / Stand up aligned to the seat
