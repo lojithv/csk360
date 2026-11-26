@@ -390,6 +390,68 @@ class CSK360_OT_click_move(bpy.types.Operator):
         return {"RUNNING_MODAL"}
 
 
+class CSK360_OT_pick_up(_CSKOperator, bpy.types.Operator):
+    """Pick up the other selected object at the playhead (walks over first if needed)"""
+    bl_idname = "csk360.pick_up"
+    bl_label = "Pick Up Selected"
+
+    @classmethod
+    def poll(cls, context):
+        return context_cast(context) is not None
+
+    def run(self, context):
+        cast = context_cast(context)
+        others = [o for o in context.selected_objects
+                  if commands.cast_for_object(context.scene, o) is None]
+        if not others:
+            raise CSKError("Select the object to pick up as well as the character "
+                           "(Ctrl+click it in the viewport).")
+        commands.pick_up(context.scene, cast.id, others[0])
+
+
+class CSK360_OT_put_down(_CSKOperator, bpy.types.Operator):
+    """Put down what the character is carrying, at the playhead"""
+    bl_idname = "csk360.put_down"
+    bl_label = "Put Down"
+
+    where: EnumProperty(name="Where", items=[
+        ("FRONT", "In Front", "On the floor in front of the character"),
+        ("SELECTED", "On Selected", "On top of the other selected object"),
+        ("CURSOR", "At 3D Cursor", "")], default="FRONT")
+
+    @classmethod
+    def poll(cls, context):
+        cast = context_cast(context)
+        return cast is not None and any(c.cast_id == cast.id and c.end < 0
+                                        for c in context.scene.csk360.carries)
+
+    def run(self, context):
+        scene = context.scene
+        cast = context_cast(context)
+        at = None
+        if self.where == "SELECTED":
+            others = [o for o in context.selected_objects
+                      if commands.cast_for_object(scene, o) is None
+                      and not any(c.object is o for c in scene.csk360.carries)]
+            if not others:
+                raise CSKError("Select where to put it as well as the character.")
+            at = others[0]
+        elif self.where == "CURSOR":
+            at = tuple(scene.cursor.location)
+        commands.put_down(scene, cast.id, at=at)
+
+
+class CSK360_OT_remove_carry(_CSKOperator, bpy.types.Operator):
+    """Stop carrying: the object goes back to where it was"""
+    bl_idname = "csk360.remove_carry"
+    bl_label = "Remove Carry"
+
+    carry_id: StringProperty()
+
+    def run(self, context):
+        commands.remove_carry(context.scene, self.carry_id)
+
+
 class CSK360_OT_remove_move(_CSKOperator, bpy.types.Operator):
     """Remove the active movement"""
     bl_idname = "csk360.remove_move"
@@ -783,6 +845,9 @@ classes = (
     CSK360_OT_jump_clip,
     CSK360_OT_add_move,
     CSK360_OT_click_move,
+    CSK360_OT_pick_up,
+    CSK360_OT_put_down,
+    CSK360_OT_remove_carry,
     CSK360_OT_remove_move,
     CSK360_OT_add_line,
     CSK360_OT_remove_line,

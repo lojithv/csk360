@@ -12,6 +12,7 @@ import contextlib
 import re
 
 import bpy
+from mathutils import Vector
 
 from . import compiler, library, world
 from .model import MOUTH_SHAPES
@@ -140,6 +141,8 @@ def _rebuild(scene, cast_ids=(), sounds=False):
             for c in proj.cast:
                 if c.id == cid:
                     warnings += compiler.compile_cast(scene, c)
+        if len(proj.carries) or any(o.get(compiler.HOME_PROP) is not None for o in scene.objects):
+            warnings += compiler.compile_objects(scene)
     return _report(scene, warnings)
 
 
@@ -215,7 +218,7 @@ def remove_cast(scene, cast_id):
     proj = scene.csk360
     index, c = _find(proj.cast, cast_id, "cast member")
     with batch(scene):
-        for coll in (proj.clips, proj.moves, proj.lines):
+        for coll in (proj.clips, proj.moves, proj.lines, proj.carries):
             for i in reversed(range(len(coll))):
                 if coll[i].cast_id == cast_id:
                     coll.remove(i)
@@ -567,6 +570,127 @@ def remove_move(scene, move_id):
 
 
 # ---------------------------------------------------------------------------
+# Carrying
+# ---------------------------------------------------------------------------
+
+REACH = 0.7   # metres from the character to the object's edge to pick it up without walking
+
+
+def _edge_distance(pos, obj):
+    m = world.measure(obj)
+    c = m["center"]
+    sx, sy, _ = m["size"]
+    dx = max(abs(pos.x - c[0]) - sx / 2, 0.0)
+    dy = max(abs(pos.y - c[1]) - sy / 2, 0.0)
+    return (dx * dx + dy * dy) ** 0.5
+
+
+def _carrying_at(scene, obj, t, ignore=None):
+    for c in scene.csk360.carries:
+        if c.object is obj and c.id != ignore and c.start <= t and (c.end < 0 or t < c.end):
+            return c
+    return None
+
+
+def pick_up(scene, cast_id, obj, start=None, helpers=(), walk=True):
+    """The character picks `obj` up at `start` (default: playhead), walking to it first
+    when it is out of reach. Refuses with a plain reason when it is too heavy.
+    Returns the carry id."""
+    cast = get_cast(scene, cast_id)
+    if isinstance(obj, str):
+        found = bpy.data.objects.get(obj)
+        if found is None:
+            raise CSKError(f"No object named '{obj}'.")
+        obj = found
+    ok, why = world.can_lift(scene, cast_id, obj, helpers=helpers)
+    if not ok:
+        raise CSKError(why)
+    start = playhead(scene) if start is None else start
+    busy = _carrying_at(scene, obj, start)
+    if busy is not None:
+        raise CSKError(f"{obj.name} is already being carried then ({busy.id}).")
+    pos, _yaw = compiler.cast_position(scene, cast, start)
+    if walk and _edge_distance(pos, obj) > REACH:
+        mid = add_move(scene, cast_id, start=start, target=obj)
+        m = get_move(scene, mid)
+        start = m.start + m.duration
+    proj = scene.csk360
+    compiler.store_home(obj)
+    with batch(scene):
+        c = proj.carries.add()
+        c.id = _new_id(proj, "carry")
+        c.cast_id = cast_id
+        c.object = obj
+        c.start = start
+        c.end = -1.0
+        carry_id = c.id
+    _rebuild(scene, [cast_id])
+    return carry_id
+
+
+def put_down(scene, cast_id, at=None, start=None, walk=True):
+    """Put down what the character is carrying: in front of them (at=None), at a point
+    (x, y[, z]) or on top of an object (one labelled Can Stand On, or any object).
+    Walks there first when needed. Returns the carry id."""
+    cast = get_cast(scene, cast_id)
+    start = playhead(scene) if start is None else start
+    open_carries = [c for c in scene.csk360.carries
+                    if c.cast_id == cast_id and c.end < 0 and c.start <= start + 1e-6]
+    if not open_carries:
+        raise CSKError(f"{cast.name} isn't carrying anything at {start:.2f}s.")
+    c = max(open_carries, key=lambda k: k.start)
+    start = max(start, c.start + 0.3)
+    kind, point, target = "FRONT", (0.0, 0.0, 0.0), None
+    if isinstance(at, str):
+        target = bpy.data.objects.get(at)
+        if target is None:
+            raise CSKError(f"No object named '{at}'.")
+    elif isinstance(at, bpy.types.Object):
+        target = at
+    elif at is not None:
+        p = list(at) + [0.0] * (3 - len(at))
+        kind, point = "POINT", tuple(float(v) for v in p[:3])
+    if target is not None:
+        kind = "OBJECT"
+    if walk and kind != "FRONT":
+        pos, _yaw = compiler.cast_position(scene, cast, start)
+        if kind == "OBJECT":
+            far = _edge_distance(pos, target) > REACH
+            mv = dict(target=target)
+        else:
+            d = Vector(point) - pos
+            d.z = 0.0
+            far = d.length > REACH + 0.3
+            # Stop short so the object lands in front of the character.
+            stop = Vector(point) - d.normalized() * compiler.PUT_FORWARD if far else None
+            mv = dict(point=tuple(stop)) if far else {}
+        if far:
+            mid = add_move(scene, cast_id, start=start, **mv)
+            m = get_move(scene, mid)
+            start = m.start + m.duration
+    with batch(scene):
+        c.end = start
+        c.put_kind = kind
+        c.put_point = point
+        c.put_object = target
+    _rebuild(scene, [cast_id])
+    return c.id
+
+
+def get_carry(scene, carry_id):
+    return _find(scene.csk360.carries, carry_id, "carry")[1]
+
+
+def remove_carry(scene, carry_id):
+    proj = scene.csk360
+    index, c = _find(proj.carries, carry_id, "carry")
+    cast_id = c.cast_id
+    with batch(scene):
+        proj.carries.remove(index)
+    _rebuild(scene, [cast_id])
+
+
+# ---------------------------------------------------------------------------
 # Dialogue
 # ---------------------------------------------------------------------------
 
@@ -758,6 +882,9 @@ def describe(scene):
                               else [round(x, 4) for x in m.target_point]),
                    "duration": round(m.duration, 4), "walk": m.walk_asset,
                    "arrival": m.arrival_asset} for m in proj.moves],
+        "carries": [{"id": c.id, "who": c.cast_id, "object": c.object.name if c.object else None,
+                     "start": round(c.start, 4), "end": round(c.end, 4), "put": c.put_kind}
+                    for c in proj.carries],
         "lines": [{"id": l.id, "who": l.cast_id, "text": l.text, "start": round(l.start, 4),
                    "duration": round(l.duration, 4), "audio": l.audio_path,
                    "visemes": len(l.visemes)} for l in proj.lines],

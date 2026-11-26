@@ -419,6 +419,13 @@ def _talk_hands():
     return ch
 
 
+def _carry():
+    ch = _sym("upper_arm", 0, -50)
+    ch.update(_sym("upper_arm", 2, 12))
+    ch.update(_sym("forearm", 0, -45))
+    return ch
+
+
 def _kneel():
     return {
         (_loc("hips"), 1): {1: -0.33},
@@ -495,6 +502,8 @@ STARTER_ASSETS = {
                                      tags="shake, no, disagree")),
     "look_around": (_look_around, dict(kind="action", layer="GESTURE", category="Gestures",
                                        tags="look, search, around, lost")),
+    "carry": (_carry, dict(kind="pose", layer="GESTURE", duration=2.0,
+                           category="Gestures", tags="carry, hold, box, lift")),
     "talk_hands": (_talk_hands, dict(kind="action", layer="GESTURE", loop=True, duration=3.0,
                                      category="Gestures", tags="talk, explain, hands, speak")),
     # Sitting, kneeling, lying

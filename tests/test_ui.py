@@ -61,6 +61,11 @@ class _Layout:
     def operator(self, idname, **kwargs):
         return _OpProps(self.test, idname)
 
+    def operator_menu_enum(self, idname, prop, **kwargs):
+        mod, name = idname.split(".")
+        op = getattr(getattr(bpy.ops, mod), name)
+        self.test.assertIn(prop, op.get_rna_type().properties.keys())
+
     def label(self, **kwargs):
         pass
 

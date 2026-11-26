@@ -193,6 +193,18 @@ class CSK360_PT_moves(_Panel, bpy.types.Panel):
         row = layout.row()
         row.template_list("CSK360_UL_moves", "", proj, "moves", proj, "active_move_index", rows=3)
         row.operator("csk360.remove_move", text="", icon="REMOVE")
+        cast_now = context_cast(context)
+        box = layout.box()
+        row = box.row(align=True)
+        row.operator("csk360.pick_up", icon="EXPORT")
+        row.operator_menu_enum("csk360.put_down", "where", text="Put Down", icon="IMPORT")
+        for c in proj.carries:
+            if cast_now is None or c.cast_id != cast_now.id:
+                continue
+            r = box.row(align=True)
+            end = "keeps it" if c.end < 0 else f"until {c.end:.1f}s"
+            r.label(text=f"{c.object.name if c.object else '?'}: {c.start:.1f}s, {end}", icon="PACKAGE")
+            r.operator("csk360.remove_carry", text="", icon="X").carry_id = c.id
         m = active_item(proj.moves, proj.active_move_index)
         cast = context_cast(context)
         if m is None or cast is None or m.cast_id != cast.id:

@@ -547,6 +547,8 @@ def compile_cast(scene, cast):
                           "blend_in": clip.blend_in, "blend_out": clip.blend_out,
                           "offset": round(clip.offset * fps(scene))})
         specs.extend(virtual[layer])
+        if layer == "GESTURE":
+            specs.extend(_carry_gesture_specs(scene, cast))
         if layer == "BODY" and cast.auto_life:
             specs.extend(_idle_specs(scene, cast, specs))
         if not specs:
@@ -598,8 +600,204 @@ def compile_dialogue(scene, base_dir=None):
     return warnings
 
 
+# ---------------------------------------------------------------------------
+# Carried objects
+# ---------------------------------------------------------------------------
+
+CARRY_BONE = "chest"
+CARRY_CONSTRAINT = "CSK360 Carry"
+CARRY_FORWARD = 0.32      # metres in front of the chest
+CARRY_HEIGHT = 0.95       # metres above the feet (object centre)
+PUT_FORWARD = 0.6         # put down this far in front of the character
+HOME_PROP = "csk360_home"
+OBJECT_ACTION_PREFIX = library.GENERATED_PREFIX + "obj."
+
+
+def cast_position(scene, cast, t):
+    """(location Vector, yaw) of a cast member at time t, from its moves."""
+    moves = sorted((m for m in scene.csk360.moves if m.cast_id == cast.id), key=lambda m: m.start)
+    keys = _compile_moves(scene, cast, moves, [])[0] if moves else [(0.0, Vector(cast.home), cast.home_yaw)]
+    prev = keys[0]
+    for k in keys:
+        if k[0] >= t:
+            if k[0] <= prev[0] + 1e-9:
+                return k[1].copy(), k[2]
+            u = (t - prev[0]) / (k[0] - prev[0])
+            return prev[1].lerp(k[1], u), prev[2] + (k[2] - prev[2]) * u
+        prev = k
+    return keys[-1][1].copy(), keys[-1][2]
+
+
+def object_home(obj):
+    """The object's resting transform before any carrying (world matrix)."""
+    raw = obj.get(HOME_PROP)
+    if raw is None:
+        return obj.matrix_world.copy()
+    v = list(raw)
+    return Matrix([v[0:4], v[4:8], v[8:12], v[12:16]])
+
+
+def store_home(obj):
+    if obj.get(HOME_PROP) is None:
+        m = obj.matrix_world
+        obj[HOME_PROP] = [m[r][c] for r in range(4) for c in range(4)]
+
+
+def _bottom_offset(obj, home):
+    """Height of the object's origin above its lowest point, at home."""
+    corners = [home @ Vector(c) for c in obj.bound_box]
+    return home.translation.z - min(c.z for c in corners)
+
+
+def _carry_basis(cast, obj, home):
+    """Object basis in chest-bone space so it sits in front of the chest, upright."""
+    rig = cast.object
+    bone = rig.data.bones.get(CARRY_BONE) if rig and rig.type == "ARMATURE" else None
+    scale = Matrix.Diagonal(home.to_scale().to_4d())
+    want = Matrix.Translation((0.0, -CARRY_FORWARD, CARRY_HEIGHT)) @ scale  # armature space
+    if bone is None:
+        return want
+    return bone.matrix_local.inverted() @ want
+
+
+def _put_matrix(scene, carry, obj, home):
+    cast = next((c for c in scene.csk360.cast if c.id == carry.cast_id), None)
+    pos, yaw = cast_position(scene, cast, carry.end)
+    rot = Matrix.Rotation(yaw, 4, "Z")
+    scale = Matrix.Diagonal(home.to_scale().to_4d())
+    lift = _bottom_offset(obj, home)
+    if carry.put_kind == "OBJECT" and carry.put_object is not None:
+        from . import world
+        m = world.measure(carry.put_object)
+        c = m["center"]
+        p = Vector((c[0], c[1], m["top"] + lift))
+    elif carry.put_kind == "POINT":
+        p = Vector(carry.put_point)
+        p.z = p.z + lift
+    else:
+        fwd = Vector((math.sin(yaw), -math.cos(yaw), 0.0))
+        p = pos + fwd * PUT_FORWARD
+        p.z = pos.z + lift
+    return Matrix.Translation(p) @ rot @ scale
+
+
+def _carry_gesture_specs(scene, cast):
+    specs = []
+    act = library.resolve("carry")
+    if act is None:
+        return specs
+    for c in scene.csk360.carries:
+        if c.cast_id != cast.id or c.object is None:
+            continue
+        end = c.end if c.end >= 0 else max(c.start + 0.5, _scene_seconds(scene))
+        specs.append({"name": f"{c.id}.carry", "action": act, "start": c.start,
+                      "duration": max(end - c.start, 0.1), "loop_mode": "HOLD",
+                      "blend_in": 0.25, "blend_out": 0.25})
+    return specs
+
+
+def _scene_seconds(scene):
+    return max((scene.frame_end - scene.frame_start) / fps(scene), 0.0)
+
+
+def clear_objects(scene, keep=()):
+    """Remove carry animation from objects that are no longer carried."""
+    for obj in list(scene.objects):
+        if obj in keep:
+            continue
+        cons = [k for k in obj.constraints if k.name.startswith(CARRY_CONSTRAINT)]
+        act = bpy.data.actions.get(OBJECT_ACTION_PREFIX + obj.name)
+        if not cons and act is None and obj.get(HOME_PROP) is None:
+            continue
+        home = object_home(obj)
+        for con in cons:
+            obj.constraints.remove(con)
+        if act is not None:
+            if obj.animation_data and obj.animation_data.action == act:
+                obj.animation_data.action = None
+            bpy.data.actions.remove(act)
+        if obj.get(HOME_PROP) is not None:
+            obj.matrix_world = home
+            del obj[HOME_PROP]
+
+
+def compile_objects(scene):
+    """Animate every carried object: home, in the carrier's arms, put down. Returns warnings."""
+    warnings = []
+    by_obj = {}
+    for c in scene.csk360.carries:
+        if c.object is None:
+            warnings.append(f"{c.id}: no object to carry")
+            continue
+        by_obj.setdefault(c.object, []).append(c)
+    clear_objects(scene, keep=set(by_obj))
+    rate = fps(scene)
+    for obj, carries in by_obj.items():
+        carries.sort(key=lambda c: c.start)
+        home = object_home(obj)
+        store_home(obj)
+        ad = obj.animation_data_create()
+        if ad.action is not None and not library.is_generated(ad.action):
+            warnings.append(f"{obj.name}: has its own animation; CSK360 can't carry it")
+            continue
+        for con in [k for k in obj.constraints if k.name.startswith(CARRY_CONSTRAINT)]:
+            obj.constraints.remove(con)
+        action, cb = _new_generated_action(OBJECT_ACTION_PREFIX + obj.name, obj)
+        loc = [_fcurve(cb, "location", i) for i in range(3)]
+        rot = [_fcurve(cb, "rotation_euler", i) for i in range(3)]
+        scl = [_fcurve(cb, "scale", i) for i in range(3)]
+
+        def key_basis(frame, m):
+            l, r, sc = m.decompose()
+            e = r.to_euler("XYZ")
+            for i in range(3):
+                _key(loc[i], frame, l[i], "CONSTANT")
+                _key(rot[i], frame, e[i], "CONSTANT")
+                _key(scl[i], frame, sc[i], "CONSTANT")
+
+        obj.rotation_mode = "XYZ"
+        cons = {}
+        f0 = scene.frame_start
+        key_basis(f0, home)
+        state = home
+        for c in carries:
+            cast = next((m for m in scene.csk360.cast if m.id == c.cast_id), None)
+            if cast is None or cast.object is None:
+                warnings.append(f"{c.id}: carrier is missing")
+                continue
+            con = cons.get(cast.id)
+            if con is None:
+                con = obj.constraints.new("CHILD_OF")
+                con.name = f"{CARRY_CONSTRAINT} {cast.id}"
+                con.target = cast.object
+                if cast.object.type == "ARMATURE" and cast.object.data.bones.get(CARRY_BONE):
+                    con.subtarget = CARRY_BONE
+                con.set_inverse_pending = False
+                con.inverse_matrix = Matrix.Identity(4)
+                cons[cast.id] = con
+                fc = _fcurve(cb, f'constraints["{con.name}"].influence')
+                _key(fc, f0, 0.0, "CONSTANT")
+            fc = _fcurve(cb, f'constraints["{con.name}"].influence')
+            fp = to_frame(scene, c.start)
+            _key(fc, fp, 1.0, "CONSTANT")
+            key_basis(fp, _carry_basis(cast, obj, home))
+            if c.end >= 0:
+                if c.end <= c.start:
+                    warnings.append(f"{c.id}: put down before it is picked up")
+                    continue
+                fd = to_frame(scene, c.end)
+                _key(fc, fd, 0.0, "CONSTANT")
+                state = _put_matrix(scene, c, obj, home)
+                key_basis(fd, state)
+        ad.action = action
+        if ad.action_suitable_slots and ad.action_slot is None:
+            ad.action_slot = ad.action_suitable_slots[0]
+    return warnings
+
+
 def compile_all(scene):
     warnings = compile_dialogue(scene)
     for cast in scene.csk360.cast:
         warnings += compile_cast(scene, cast)
+    warnings += compile_objects(scene)
     return warnings

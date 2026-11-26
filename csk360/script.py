@@ -37,7 +37,7 @@ EXPRESSIONS = ("neutral", "happy", "sad", "angry", "surprised", "thinking", "win
 SIZES = {"1080p": (1920, 1080), "720p": (1280, 720), "4k": (3840, 2160),
          "9:16": (1080, 1920), "vertical": (1080, 1920), "square": (1080, 1080)}
 ENTRY_KEYS = {"at", "after", "who", "do", "for", "move_to", "then", "say", "face", "gesture",
-              "voice", "speed", "mode", "layer"}
+              "voice", "speed", "mode", "layer", "pick_up", "put_down", "helpers"}
 
 
 class ScriptError(CSKError):
@@ -374,8 +374,15 @@ def validate(script, scene=None):
             errors.append(f"{where}: 'at' must be seconds, e.g. at: 6.")
         if "after" in e and e["after"] != "prev":
             errors.append(f"{where}: only 'after: prev' is supported.")
-        if not any(k in e for k in ("do", "move_to", "say", "gesture", "face")):
-            errors.append(f"{where}: nothing to do; use do, move_to, say, gesture or face.")
+        if not any(k in e for k in ("do", "move_to", "say", "gesture", "face", "pick_up", "put_down")):
+            errors.append(f"{where}: nothing to do; use do, move_to, say, gesture, face, "
+                          "pick_up or put_down.")
+        for key in ("pick_up", "put_down"):
+            t = e.get(key)
+            if key in e and isinstance(t, str) and t != "front" and scene is not None \
+                    and bpy.data.objects.get(t) is None:
+                errors.append(f"{where}: no object named '{t}' to {key.replace('_', ' ')}."
+                              + _suggest(t, [o.name for o in bpy.data.objects]))
         for key in ("do", "gesture", "then"):
             if key in e and not _asset_ok(e[key], assets):
                 errors.append(f"{where}: no pose or action '{e[key]}'." + _suggest(e[key], assets))
@@ -502,6 +509,22 @@ def build(scene, script, voices=True, clear=True):
             made["clips"].append(cid)
             c = commands.get_clip(scene, cid)
             end = max(end, c.start + c.duration)
+        if "pick_up" in e:
+            try:
+                kid = commands.pick_up(scene, who, str(e["pick_up"]), start=start or end,
+                                       helpers=[ids[h] for h in e.get("helpers", []) if h in ids])
+            except CSKError as err:
+                raise ScriptError([f"timeline entry for {e['who']}: {err}"])
+            made.setdefault("carries", []).append(kid)
+            end = commands.get_carry(scene, kid).start + 0.3
+        if "put_down" in e:
+            t = e["put_down"]
+            at = None if t in (None, "front", True) else (list(t) if isinstance(t, list) else str(t))
+            try:
+                kid = commands.put_down(scene, who, at=at, start=start or end)
+            except CSKError as err:
+                raise ScriptError([f"timeline entry for {e['who']}: {err}"])
+            end = commands.get_carry(scene, kid).end + 0.3
         line_id = None
         if "say" in e:
             line_id = commands.add_line(scene, who, str(e["say"]), start=start,

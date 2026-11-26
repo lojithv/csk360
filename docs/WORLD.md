@@ -43,4 +43,24 @@ objects:
   Crate: {liftable: true, weight: 12, jump_onto: true}
 ```
 
-Pick up, carry, jump onto and spawn come next (see TODO.md) and will use these checks.
+## Pick up, carry and put down
+
+Select the character, Ctrl+click the object, and press **Pick Up Selected** in the
+Movement panel. If the object is out of reach the character walks over first.
+CSK360 checks the weight against the character's strength and says why not
+when it's too heavy. While carrying, the character holds the object in front of
+the chest (the *carry* pose plays on the Gesture layer) and it travels with them.
+
+**Put Down** puts it on the floor in front of the character, on top of another
+selected object, or at the 3D cursor (walking there first when needed).
+
+In scripts:
+
+```yaml
+timeline:
+  - {at: 0, who: leo, pick_up: Box}
+  - {after: prev, who: leo, put_down: Shelf}      # or [x, y], or front
+  - {at: 6, who: maya, pick_up: Crate, helpers: [leo]}   # strengths add up for the check
+```
+
+Jumping onto surfaces and spawning objects come next (see TODO.md).

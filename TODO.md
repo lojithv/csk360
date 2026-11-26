@@ -59,10 +59,11 @@ Core (in CSK360, because scripts, the compiler and the UI all need it):
 - [x] Object labels: walkable floor, can jump onto, obstacle, liftable, weight (kg), seat; Labels panel for the selected object
 - [x] Detect labels automatically (floors, surfaces within jump height, small objects as liftable with weight from size); one click to confirm
 - [x] Character abilities: weight, strength (max lift kg), jump height, walk speed; checks with plain-English reasons ("Leo can lift 25 kg; the fridge is 90 kg")
-- [ ] Pick up / carry / put down an object (hand attachment keyed by the compiler); lift a person when strong enough
+- [x] Pick up / carry / put down an object (walks over first; carried in front of the chest with a carry pose; put down in front, at a point or on an object)
+- [ ] Lift and carry a person when strong enough (the check exists; animation to do)
 - [ ] Jump onto / off a surface (arc move, uses jump height)
 - [ ] Spawn an object at a time (appears with a pop, or is "made" by a character)
-- [ ] Scene-script keys for all of the above (`pick_up`, `put_down`, `jump_onto`, `spawn`) and validation that names the failed ability
+- [~] Scene-script keys for all of the above (`pick_up`, `put_down` and `helpers` done; `jump_onto`, `spawn` to do) and validation that names the failed ability
 - [ ] Teamwork: two or more characters lift something too heavy for one (combined strength)
 
 Companion extension `csk360_agents` (separate add-on that drives CSK360's `commands` API):

@@ -140,6 +140,22 @@ class CSK360_Move(bpy.types.PropertyGroup):
                             unit="TIME_ABSOLUTE")
 
 
+class CSK360_Carry(bpy.types.PropertyGroup):
+    """A character picks an object up at `start` and puts it down at `end` (end < 0: keeps it)."""
+    id: StringProperty(name="ID")
+    cast_id: StringProperty(name="Cast ID")
+    object: PointerProperty(name="Object", type=bpy.types.Object, update=_changed)
+    start: FloatProperty(name="Pick Up At", min=0.0, unit="TIME_ABSOLUTE", update=_changed)
+    end: FloatProperty(name="Put Down At", default=-1.0, unit="TIME_ABSOLUTE", update=_changed,
+                       description="Seconds; negative = keeps carrying it")
+    put_kind: EnumProperty(name="Put Down", items=[
+        ("FRONT", "In Front", "On the floor in front of the character"),
+        ("POINT", "At a Point", ""),
+        ("OBJECT", "On an Object", "On top of another object")], default="FRONT", update=_changed)
+    put_point: FloatVectorProperty(name="Point", size=3, subtype="TRANSLATION", update=_changed)
+    put_object: PointerProperty(name="On", type=bpy.types.Object, update=_changed)
+
+
 class CSK360_DialogueLine(bpy.types.PropertyGroup):
     id: StringProperty(name="ID")
     cast_id: StringProperty(name="Speaker")
@@ -165,6 +181,7 @@ class CSK360_Project(bpy.types.PropertyGroup):
     clips: CollectionProperty(type=CSK360_Clip)
     moves: CollectionProperty(type=CSK360_Move)
     lines: CollectionProperty(type=CSK360_DialogueLine)
+    carries: CollectionProperty(type=CSK360_Carry)
 
     active_cast_index: IntProperty()
     active_clip_index: IntProperty()
@@ -184,6 +201,7 @@ classes = (
     CSK360_CastMember,
     CSK360_Clip,
     CSK360_Move,
+    CSK360_Carry,
     CSK360_DialogueLine,
     CSK360_Project,
 )
