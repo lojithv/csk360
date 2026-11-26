@@ -42,8 +42,9 @@ SUPERTONIC_URL = f"https://huggingface.co/Supertone/supertonic-3/resolve/{SUPERT
 SUPERTONIC_FILES = ("onnx/tts.json", "onnx/unicode_indexer.json", "onnx/duration_predictor.onnx",
                     "onnx/text_encoder.onnx", "onnx/vector_estimator.onnx", "onnx/vocoder.onnx", "LICENSE")
 RHUBARB_VERSION = "1.14.0"
+RHUBARB_PLATFORM = {"win32": "Windows", "darwin": "macOS"}.get(sys.platform, "Linux")
 RHUBARB_URL = (f"https://github.com/DanielSWolf/rhubarb-lip-sync/releases/download/v{RHUBARB_VERSION}/"
-               f"Rhubarb-Lip-Sync-{RHUBARB_VERSION}-Windows.zip")
+               f"Rhubarb-Lip-Sync-{RHUBARB_VERSION}-{RHUBARB_PLATFORM}.zip")
 SUPERTONIC_ACCEPTED = "ACCEPTED_TERMS"
 
 KOKORO_LANGS = {"a": "en-us", "b": "en-gb", "e": "es", "f": "fr-fr", "h": "hi", "i": "it",
@@ -157,6 +158,9 @@ def install(home, engines, supertonic_from=None):
         with zipfile.ZipFile(z) as zf:
             zf.extractall(p["rhubarb"])
         shutil.rmtree(tmp, ignore_errors=True)
+        exe = rhubarb_exe(home)
+        if exe and sys.platform != "win32":
+            os.chmod(exe, 0o755)  # zipfile drops the executable bit
     return status(home)
 
 
