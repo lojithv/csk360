@@ -355,6 +355,7 @@ def _idle():
 def _wave():
     return {
         (_rot("upper_arm_R"), 0): {1: 0, 8: -160, 31: -160, 37: 0},
+        (_rot("upper_arm_R"), 2): {1: 0, 8: -35, 31: -35, 37: 0},   # out to the side, clear of the head
         (_rot("forearm_R"), 2): {1: 0, 8: 0, 12: 30, 16: -15, 20: 30, 24: -15, 28: 30, 31: 0},
     }
 
