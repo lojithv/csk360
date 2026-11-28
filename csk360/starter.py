@@ -1,15 +1,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Starter 3D toon character (`biped_toon`) and starter library actions.
+"""Starter character (a robot) and starter library actions.
 
-Generated entirely from code so CSK360 is usable before any art exists:
-one armature with the standard `biped_toon` bone names, one simple toon body
-mesh weighted 100% per part (no weight painting), mouth shape keys driven by
-the rig's `mouth` control, and a handful of library actions.
+The body is Quaternius' RobotExpressive (CC0 1.0), bundled in assets/robot.blend
+by tools/make_robot.py. CSK360 builds its own armature with the standard
+`biped_toon` bone names at the robot's joints, adds a mouth grille with shape
+keys driven by the rig's `mouth` control and blinking eye lenses, and gives
+each new robot its own colour. Library actions are generated from code.
 
 Characters face -Y (Blender's front view). Units are metres.
 """
 
 import math
+import os
 
 import bmesh
 import bpy
@@ -18,67 +20,74 @@ from mathutils import Matrix, Vector
 from . import library
 from .model import MOUTH_SHAPES
 
-RIG_TYPE = "biped_toon"
+RIG_TYPE = "biped_toon"   # the bone layout; the starter body is now a robot
 MOUTH_PROP = "mouth"
 BLINK_PROP = "blink"
 
-# name: (head, tail, parent). Left side is +X; right side is mirrored.
-_CENTER_BONES = {
-    "root": ((0, 0, 0), (0, 0.25, 0), None),
-    "hips": ((0, 0, 0.72), (0, 0, 0.86), "root"),
-    "spine": ((0, 0, 0.86), (0, 0, 1.0), "hips"),
-    "chest": ((0, 0, 1.0), (0, 0, 1.15), "spine"),
-    "neck": ((0, 0, 1.15), (0, 0, 1.22), "chest"),
-    "head": ((0, 0, 1.22), (0, 0, 1.62), "neck"),
-}
-_SIDE_BONES = {
-    "shoulder": ((0.04, 0, 1.12), (0.17, 0, 1.12), "chest"),
-    "upper_arm": ((0.19, 0, 1.12), (0.21, 0, 0.90), "shoulder"),
-    "forearm": ((0.21, 0, 0.90), (0.22, 0, 0.70), "upper_arm"),
-    "hand": ((0.22, 0, 0.70), (0.22, 0, 0.62), "forearm"),
-    "thigh": ((0.09, 0, 0.74), (0.09, 0, 0.41), "hips"),
-    "shin": ((0.09, 0, 0.41), (0.09, 0, 0.08), "thigh"),
-    "foot": ((0.09, 0, 0.08), (0.09, -0.14, 0.0), "shin"),
-}
+ASSET = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "robot.blend")
+ASSET_MESH = "csk360_robot"
+# The starter robot is Quaternius' RobotExpressive (CC0 1.0), converted by tools/make_robot.py.
+_SIDE_NAMES = ("shoulder", "upper_arm", "forearm", "hand", "thigh", "shin", "foot")
+_CENTER_NAMES = ("root", "hips", "spine", "chest", "neck", "head")
 
 
-def _mirror(p):
-    return (-p[0], p[1], p[2])
+def _asset_mesh():
+    """The robot mesh template, appended from the bundled asset once per file."""
+    me = bpy.data.meshes.get(ASSET_MESH)
+    if me is None or me.library is not None:
+        with bpy.data.libraries.load(ASSET, link=False) as (_src, dst):
+            dst.meshes = [ASSET_MESH]
+        me = dst.meshes[0]
+        me.use_fake_user = True
+        for m in me.materials:
+            if m is not None:
+                m.use_fake_user = True
+                bsdf = m.node_tree.nodes.get("Principled BSDF") if m.node_tree else None
+                if bsdf is not None:   # viewport (Solid/Workbench) shows the same colour
+                    m.diffuse_color = bsdf.inputs["Base Color"].default_value
+    return me
+
+
+def _joints():
+    return _asset_mesh()["csk360_joints"].to_dict()
 
 
 def bone_specs():
-    specs = dict(_CENTER_BONES)
-    for base, (head, tail, parent) in _SIDE_BONES.items():
-        for side in ("L", "R"):
-            h, t = (head, tail) if side == "L" else (_mirror(head), _mirror(tail))
-            par = parent if parent in _CENTER_BONES else f"{parent}_{side}"
-            specs[f"{base}_{side}"] = (h, t, par)
+    """{bone: (head, tail, parent)} in the robot's rest pose. Left side is +X."""
+    j = _joints()
+    top = j["top"]
+    specs = {
+        "root": ((0, 0, 0), (0, 0.25, 0), None),
+        "hips": ((0, 0, j["hips"]), (0, 0, j["abdomen"]), "root"),
+        "spine": ((0, 0, j["abdomen"]), (0, 0, j["torso"]), "hips"),
+        "chest": ((0, 0, j["torso"]), (0, 0, j["neck"]), "spine"),
+        "neck": ((0, 0, j["neck"]), (0, 0, j["head"]), "chest"),
+        "head": ((0, 0, j["head"]), (0, 0, top), "neck"),
+    }
+    sh = Vector(j["shoulder"])
+    foot = Vector(j["foot"])
+    side = {
+        "shoulder": ((0.04, sh.y, sh.z), tuple(j["upper_arm"]), "chest"),
+        "upper_arm": (tuple(j["upper_arm"]), tuple(j["forearm"]), "shoulder"),
+        "forearm": (tuple(j["forearm"]), tuple(j["hand"]), "upper_arm"),
+        "hand": (tuple(j["hand"]), tuple(j["hand_tip"]), "forearm"),
+        "thigh": (tuple(j["thigh"]), tuple(j["shin"]), "hips"),
+        "shin": (tuple(j["shin"]), tuple(j["foot"]), "thigh"),
+        "foot": (tuple(j["foot"]), (foot.x, foot.y - 0.16, 0.0), "shin"),
+    }
+    for base, (head, tail, parent) in side.items():
+        for s, sx in (("L", 1), ("R", -1)):
+            h = (head[0] * sx, head[1], head[2])
+            t = (tail[0] * sx, tail[1], tail[2])
+            par = parent if parent in _CENTER_NAMES else f"{parent}_{s}"
+            specs[f"{base}_{s}"] = (h, t, par)
     return specs
 
 
-BONES = tuple(bone_specs())
+BONES = _CENTER_NAMES + tuple(f"{b}_{s}" for b in _SIDE_NAMES for s in ("L", "R"))
 # Gestures may only key these (design doc: layer masking by convention).
 UPPER_BODY = tuple(b for b in BONES if b in ("chest", "neck", "head")
                    or b.split("_")[0] in ("shoulder", "upper", "forearm", "hand"))
-
-# Body parts: (bone, centre, radii, material)
-_PARTS = [
-    ("hips", (0, 0, 0.80), (0.15, 0.11, 0.10), "outfit_bottom"),
-    ("spine", (0, 0, 1.00), (0.17, 0.12, 0.20), "outfit_top"),
-    ("head", (0, 0, 1.42), (0.20, 0.19, 0.21), "skin"),
-    ("head", (0.075, -0.17, 1.47), (0.03, 0.02, 0.04), "eye"),
-    ("head", (-0.075, -0.17, 1.47), (0.03, 0.02, 0.04), "eye"),
-]
-for _side, _sx in (("L", 1), ("R", -1)):
-    _PARTS += [
-        (f"upper_arm_{_side}", (0.20 * _sx, 0, 1.01), (0.045, 0.045, 0.12), "outfit_top"),
-        (f"forearm_{_side}", (0.215 * _sx, 0, 0.80), (0.04, 0.04, 0.11), "skin"),
-        (f"hand_{_side}", (0.22 * _sx, 0, 0.65), (0.045, 0.04, 0.05), "skin"),
-        (f"thigh_{_side}", (0.09 * _sx, 0, 0.58), (0.065, 0.065, 0.17), "outfit_bottom"),
-        (f"shin_{_side}", (0.09 * _sx, 0, 0.25), (0.05, 0.05, 0.17), "outfit_bottom"),
-        (f"foot_{_side}", (0.09 * _sx, -0.05, 0.035), (0.055, 0.1, 0.035), "shoes"),
-    ]
-_MOUTH = ("head", (0, -0.185, 1.34), (0.055, 0.02, 0.012), "mouth")
 
 # Mouth shape per Rhubarb viseme: (width factor, height factor) over the rest mouth (X).
 MOUTH_SCALES = {
@@ -91,15 +100,18 @@ MOUTH_SCALES = {
     "G": (1.0, 0.8),   # F V
     "H": (1.0, 2.2),   # L
 }
+MOUTH_RADII = (0.075, 0.02, 0.012)
+MOUTH_COLOUR = (0.02, 0.02, 0.025, 1.0)
 
-COLOURS = {
-    "skin": (0.93, 0.72, 0.58, 1),
-    "outfit_top": (0.20, 0.45, 0.85, 1),
-    "outfit_bottom": (0.18, 0.18, 0.25, 1),
-    "shoes": (0.35, 0.2, 0.1, 1),
-    "eye": (0.03, 0.03, 0.03, 1),
-    "mouth": (0.45, 0.08, 0.1, 1),
-}
+# Body colour per character (the robot's "Main" material); picked in turn.
+PALETTE = [
+    (0.59, 0.29, 0.04, 1.0),   # amber (the original)
+    (0.08, 0.30, 0.65, 1.0),   # blue
+    (0.10, 0.45, 0.22, 1.0),   # green
+    (0.60, 0.10, 0.12, 1.0),   # red
+    (0.40, 0.18, 0.55, 1.0),   # purple
+    (0.55, 0.55, 0.58, 1.0),   # silver
+]
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +128,22 @@ def _material(name, colour):
         if bsdf is not None:
             bsdf.inputs["Base Color"].default_value = colour
             bsdf.inputs["Roughness"].default_value = 0.8
+    return mat
+
+
+def _body_material(index):
+    """A copy of the robot's main material in the next palette colour."""
+    colour = PALETTE[index % len(PALETTE)]
+    name = f"CSK360 robot {index % len(PALETTE) + 1}"
+    mat = bpy.data.materials.get(name)
+    if mat is None:
+        base = next((m for m in _asset_mesh().materials if m and m.name.startswith("Main")), None)
+        mat = base.copy() if base is not None else _material(name, colour)
+        mat.name = name
+        bsdf = mat.node_tree.nodes.get("Principled BSDF") if mat.node_tree else None
+        if bsdf is not None:
+            bsdf.inputs["Base Color"].default_value = colour
+        mat.diffuse_color = colour
     return mat
 
 
@@ -139,38 +167,60 @@ def _add_edit_bones(arm):
             eb.use_connect = (Vector(eb.head) - Vector(arm.edit_bones[parent].tail)).length < 1e-6
 
 
-def _build_body(name, rig):
-    mesh = bpy.data.meshes.new(name + "_body")
-    body = bpy.data.objects.new(name + "_body", mesh)
-    mats = list(COLOURS)
-    for m in mats:
-        mesh.materials.append(_material(f"CSK360 {m}", COLOURS[m]))
-    groups = {b: i for i, b in enumerate(BONES)}
-    for b in BONES:
-        body.vertex_groups.new(name=b)
+def _robot_count():
+    return sum(1 for o in bpy.data.objects if o.get("csk360_rig") == RIG_TYPE)
 
+
+def _build_body(name, rig):
+    template = _asset_mesh()
+    mesh = template.copy()
+    mesh.name = name + "_body"
+    for key in ("csk360_joints", "csk360_groups"):
+        if key in mesh.keys():
+            del mesh[key]
+    mesh.use_fake_user = False
+    body = bpy.data.objects.new(name + "_body", mesh)
+    for g in template["csk360_groups"]:
+        body.vertex_groups.new(name=g)
+    for b in BONES:
+        if b not in body.vertex_groups:
+            body.vertex_groups.new(name=b)
+    # This robot's colour.
+    main = _body_material(_robot_count() - 1)
+    for i, m in enumerate(mesh.materials):
+        if m is not None and m.name.startswith("Main"):
+            mesh.materials[i] = main
+
+    # Mouth: a small dark grille on the face plate, below the eyes.
+    j = _joints()
+    head_z, top = j["head"], j["top"]
+    black = {i for i, m in enumerate(mesh.materials) if m is not None and m.name.startswith("Black")}
+    eye_top = head_z + 0.7 * (top - head_z)   # eye lenses; the brows sit above
+    eye_verts = {"L": [], "R": []}
+    for p in mesh.polygons:
+        if p.material_index in black and p.center.z < eye_top:
+            for vi in p.vertices:
+                eye_verts["L" if mesh.vertices[vi].co.x > 0 else "R"].append(vi)
+    mouth_z = head_z + 0.2 * (top - head_z)
+    plate = [v.co.y for v in mesh.vertices
+             if abs(v.co.x) < 0.08 and abs(v.co.z - mouth_z) < 0.04]
+    front_y = min(plate) if plate else -0.35
+    centre = Vector((0.0, front_y - MOUTH_RADII[1] * 0.3, mouth_z))
     bm = bmesh.new()
+    bm.from_mesh(mesh)
     deform = bm.verts.layers.deform.verify()
-    mouth_verts = []
-    eyes = []  # (centre, verts)
-    for part in _PARTS + [_MOUTH]:
-        bone, centre, radii, mat = part
-        matrix = Matrix.Translation(centre) @ Matrix.Diagonal((*radii, 1.0))
-        res = bmesh.ops.create_uvsphere(bm, u_segments=20, v_segments=12, radius=1.0, matrix=matrix)
-        verts = res["verts"]
-        for v in verts:
-            v[deform][groups[bone]] = 1.0
-        faces = {f for v in verts for f in v.link_faces}
-        for f in faces:
-            f.material_index = mats.index(mat)
-            f.smooth = True
-        if part is _MOUTH:
-            mouth_verts = verts
-        elif mat == "eye":
-            eyes.append((Vector(centre), verts))
+    head_group = body.vertex_groups["head"].index
+    mouth_mat = len(mesh.materials)
+    mesh.materials.append(_material("CSK360 robot mouth", MOUTH_COLOUR))
+    res = bmesh.ops.create_uvsphere(bm, u_segments=16, v_segments=8, radius=1.0,
+                                    matrix=Matrix.Translation(centre) @
+                                    Matrix.Diagonal((*MOUTH_RADII, 1.0)))
+    for v in res["verts"]:
+        v[deform][head_group] = 1.0
+    for f in {f for v in res["verts"] for f in v.link_faces}:
+        f.material_index = mouth_mat
     bm.verts.index_update()
-    mouth_idx = [v.index for v in mouth_verts]
-    eye_idx = [(c, [v.index for v in vs]) for c, vs in eyes]
+    mouth_idx = [v.index for v in res["verts"]]
     bm.to_mesh(mesh)
     bm.free()
 
@@ -180,7 +230,6 @@ def _build_body(name, rig):
 
     # Mouth shape keys, driven by rig["mouth"] (0 = X rest, 1..8 = A..H).
     body.shape_key_add(name="Basis", from_mix=False)
-    centre = Vector(_MOUTH[1])
     for i, shape in enumerate(MOUTH_SHAPES[1:], start=1):
         sx, sz = MOUTH_SCALES[shape]
         kb = body.shape_key_add(name=f"mouth_{shape}", from_mix=False)
@@ -198,12 +247,15 @@ def _build_body(name, rig):
         var.targets[0].data_path = f'["{MOUTH_PROP}"]'
         drv.expression = f"m == {i}"
 
-    # Blink: eyes squash shut, driven directly by rig["blink"] (0 open .. 1 closed).
+    # Blink: the eye lenses squash shut, driven directly by rig["blink"] (0 open .. 1 closed).
     kb = body.shape_key_add(name="blink", from_mix=False)
-    for centre, idx in eye_idx:
+    for idx in eye_verts.values():
+        if not idx:
+            continue
+        c = sum((mesh.vertices[vi].co for vi in idx), Vector()) / len(idx)
         for vi in idx:
-            co = mesh.vertices[vi].co - centre
-            kb.data[vi].co = centre + Vector((co.x, co.y, co.z * 0.08))
+            co = mesh.vertices[vi].co - c
+            kb.data[vi].co = c + Vector((co.x, co.y, co.z * 0.1))
     fc = kb.driver_add("value")
     drv = fc.driver
     drv.type = "AVERAGE"
@@ -318,9 +370,22 @@ def _arms_crossed():
     }
 
 
+def _legs():
+    """Leg measurements of the starter body (metres)."""
+    j = _joints()
+    thigh = Vector(j["thigh"]).z - Vector(j["shin"]).z
+    shin = Vector(j["shin"]).z - Vector(j["foot"]).z
+    back = max(v.co.y for v in _asset_mesh().vertices)   # furthest point behind
+    return {"hips": j["thigh"][2], "thigh": thigh, "shin": shin, "ankle": j["foot"][2],
+            "back": back, "length": thigh + shin}
+
+
 def _sit():
+    g = _legs()
+    # Thighs level, shins down: feet back on the floor.
+    drop = g["hips"] - g["shin"] - g["ankle"]
     return {
-        (_loc("hips"), 1): {1: -0.30},
+        (_loc("hips"), 1): {1: -drop},
         (_rot("thigh_L"), 0): {1: -90},
         (_rot("thigh_R"), 0): {1: -90},
         (_rot("shin_L"), 0): {1: 90},
@@ -340,8 +405,8 @@ def _sym(base, axis, value_l, frames=None, mirror_sign=-1):
 
 def _point():
     return {
-        (_rot("upper_arm_R"), 0): {1: -85},
-        (_rot("forearm_R"), 0): {1: -5},
+        (_rot("upper_arm_R"), 0): {1: -80},
+        (_rot("forearm_R"), 0): {1: 38},    # straighten the robot's relaxed elbow
         (_rot("head"), 2): {1: -8},
     }
 
@@ -427,19 +492,27 @@ def _carry():
 
 
 def _kneel():
+    g = _legs()
+    # Both knees on the floor, shins back.
+    drop = g["hips"] - g["thigh"] - 0.04
     return {
-        (_loc("hips"), 1): {1: -0.33},
-        (_rot("thigh_L"), 0): {1: -90},
-        (_rot("shin_L"), 0): {1: 90},
-        (_rot("thigh_R"), 0): {1: 5},
+        (_loc("hips"), 1): {1: -drop},
+        (_rot("thigh_L"), 0): {1: -5},
+        (_rot("thigh_R"), 0): {1: -5},
+        (_rot("shin_L"), 0): {1: 95},
         (_rot("shin_R"), 0): {1: 95},
+        (_rot("foot_L"), 0): {1: -40},
         (_rot("foot_R"), 0): {1: -40},
+        (_rot("spine"), 0): {1: -5},
     }
 
 
 def _lie_down():
+    g = _legs()
+    # Rotated onto the back, the furthest-back point rests on the floor.
+    drop = g["hips"] - g["back"] - 0.01
     return {
-        (_loc("hips"), 1): {1: -0.6},
+        (_loc("hips"), 1): {1: -drop},
         (_rot("hips"), 0): {1: -90},
         (_rot("upper_arm_L"), 2): {1: -10},
         (_rot("upper_arm_R"), 2): {1: 10},
@@ -471,9 +544,9 @@ STARTER_ASSETS = {
     # Standing and motion
     "idle": (_idle, dict(kind="action", layer="BODY", loop=True, duration=4.0,
                          category="Standing", tags="idle, stand, wait")),
-    "walk": (_walk, dict(kind="action", layer="BODY", loop=True, stride=0.35,
+    "walk": (_walk, dict(kind="action", layer="BODY", loop=True, stride=0.30,
                          category="Motion keys", tags="walk, move")),
-    "run": (_run, dict(kind="action", layer="BODY", loop=True, stride=0.75,
+    "run": (_run, dict(kind="action", layer="BODY", loop=True, stride=0.64,
                        category="Motion keys", tags="run, jog, hurry, move")),
     "jump": (_jump, dict(kind="action", layer="BODY", favorite=True,
                          category="Motion keys", tags="jump, hop, leap")),

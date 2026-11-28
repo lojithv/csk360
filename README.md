@@ -17,7 +17,7 @@ cartoons, and at AI agents that build the same scenes from a script.
 
 | Feature | How |
 | --- | --- |
-| Starter character | **CSK360 tab → Add Starter Character**: a code-built 3D toon (`biped_toon` bones, mouth shape keys driven by the `mouth` control) plus starter actions `idle`, `walk`, `wave`, `arms_crossed`, `sit` |
+| Starter character | **CSK360 tab → Add Starter Character**: a robot (Quaternius' RobotExpressive, CC0) on CSK360's `biped_toon` bones, with a lip-sync mouth driven by the `mouth` control, blinking eyes and a new colour per robot, plus 21 starter poses and actions |
 | Cast | Or use your own rig: select it, **CSK360 tab → Cast → +** |
 | Pose and action clips | Clips on Body / Gesture / Face layers, at the playhead, with default length from the library |
 | Clip length | `]` / `[` ±1 second, `Shift` ±1 frame (Object Mode), or the −1 s / +1 s buttons |

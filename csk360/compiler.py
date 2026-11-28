@@ -226,8 +226,9 @@ def approach_point(obj, from_pos):
     for child in obj.children:
         if "approach" in child.name.lower():
             return child.matrix_world.translation.copy()
-    center = obj.matrix_world.translation.copy()
-    corners = [obj.matrix_world @ Vector(c) for c in obj.bound_box]
+    mw = object_home(obj)   # carried objects: where they rest, not where they are now
+    center = mw.translation.copy()
+    corners = [mw @ Vector(c) for c in obj.bound_box]
     lo = Vector((min(c.x for c in corners), min(c.y for c in corners), 0.0))
     hi = Vector((max(c.x for c in corners), max(c.y for c in corners), 0.0))
     if from_pos is None or (hi - lo).length < 0.01:
@@ -704,8 +705,8 @@ def compile_dialogue(scene, base_dir=None):
 
 CARRY_BONE = "chest"
 CARRY_CONSTRAINT = "CSK360 Carry"
-CARRY_FORWARD = 0.32      # metres in front of the chest
-CARRY_HEIGHT = 0.95       # metres above the feet (object centre)
+CARRY_FORWARD = 0.36      # metres in front of the chest
+CARRY_HEIGHT = 0.82       # metres above the feet (object centre)
 PUT_FORWARD = 0.6         # put down this far in front of the character
 HOME_PROP = "csk360_home"
 SPAWN_POP = 0.3           # seconds an object takes to pop into place

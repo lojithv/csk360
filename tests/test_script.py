@@ -148,7 +148,7 @@ class BuildTests(unittest.TestCase):
                          {"after": "prev", "who": "leo", "do": "arms_crossed"}]}), ".json")
         script.build(self.scene, data, voices=False)
         clip = self.scene.csk360.clips[0]
-        self.assertAlmostEqual(clip.start, 2.0, places=4)  # 1.4 m at the walk's 0.7 m/s
+        self.assertAlmostEqual(clip.start, 1.4 / 0.6, places=4)  # 1.4 m at the walk's 0.6 m/s
 
 
 class CliTests(unittest.TestCase):

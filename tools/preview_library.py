@@ -29,7 +29,7 @@ names = list(starter.STARTER_ASSETS)
 cols = 7
 rows = math.ceil(len(names) / cols)
 for i, name in enumerate(names):
-    x, z = (i % cols) * 1.1, (rows - 1 - i // cols) * 2.2
+    x, z = (i % cols) * 1.45, (rows - 1 - i // cols) * 2.2
     cid = commands.add_starter_character(scene, name.replace("_", " ").title(), location=(x, 0, z))
     c = commands.get_cast(scene, cid)
     c.auto_life = False
@@ -47,8 +47,8 @@ for i, name in enumerate(names):
 cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
 scene.collection.objects.link(cam)
 cam.data.type = "ORTHO"
-cam.data.ortho_scale = max(cols * 1.1 + 0.4, rows * 2.2 * 1800 / 1100)
-cam.location = ((cols - 1) * 1.1 / 2, -12, 0.8 + (rows - 1) * 1.1)
+cam.data.ortho_scale = max(cols * 1.45 + 0.4, rows * 2.2 * 1800 / 1100)
+cam.location = ((cols - 1) * 1.45 / 2, -12, 0.85 + (rows - 1) * 1.1)
 cam.rotation_euler = (math.radians(90), 0, 0)
 world = bpy.data.worlds.new("w")
 world.color = (0.55, 0.57, 0.62)

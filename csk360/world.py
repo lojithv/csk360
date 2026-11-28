@@ -83,7 +83,10 @@ def clear_label(obj):
 def measure(obj):
     """World-space size of an object's bounding box."""
     obj = _obj(obj)
-    corners = [obj.matrix_world @ Vector(c) for c in obj.bound_box]
+    from . import compiler
+    # Carried or spawned objects are animated; measure them where they rest.
+    mw = compiler.object_home(obj)
+    corners = [mw @ Vector(c) for c in obj.bound_box]
     lo = Vector([min(c[i] for c in corners) for i in range(3)])
     hi = Vector([max(c[i] for c in corners) for i in range(3)])
     size = hi - lo

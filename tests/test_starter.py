@@ -35,7 +35,8 @@ class StarterTests(unittest.TestCase):
     def test_body_is_weighted_and_deforms(self):
         body = self.body()
         self.assertEqual(body.modifiers[0].object, self.rig)
-        self.assertTrue(all(len(v.groups) == 1 for v in body.data.vertices))
+        for v in body.data.vertices:
+            self.assertAlmostEqual(sum(g.weight for g in v.groups), 1.0, places=3)
 
     def test_mouth_shape_keys_follow_mouth_control(self):
         body = self.body()
@@ -55,7 +56,7 @@ class StarterTests(unittest.TestCase):
     def test_starter_library(self):
         self.assertEqual(set(library.asset_ids(marked_only=True)), set(starter.STARTER_ASSETS))
         walk = library.info(bpy.data.actions["walk"])
-        self.assertEqual((walk["loop_mode"], walk["stride"]), ("LOOP", 0.35))
+        self.assertEqual((walk["loop_mode"], walk["stride"]), ("LOOP", 0.30))
         self.assertEqual(library.default_walk(), "walk")
 
     def test_picker_search_and_pie_favourites(self):
@@ -137,7 +138,7 @@ class StarterTests(unittest.TestCase):
 
     def test_walk_move_with_starter_walk(self):
         mid = commands.add_move(self.scene, self.leo, start=0, point=(1.0, -0.8, 0.0))
-        self.assertAlmostEqual(commands.get_move(self.scene, mid).duration, 2.8 / 0.7 / 1.0, places=3)
+        self.assertAlmostEqual(commands.get_move(self.scene, mid).duration, 2.8 / 0.6 / 1.0, places=3)
 
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ Status: `[ ]` to do, `[~]` in progress, `[x]` done, `[!]` blocked (reason given)
 - [x] Blinks every 2–5 s (starter character eyelids + `blink` control)
 - [x] Idle when no Body clip is active
 - [x] Listeners turn their heads toward whoever is speaking
-- [ ] Face layer expressions on the starter character (happy, sad, angry, surprised, worried, thinking)
+- [ ] Face layer expressions on the starter character (happy, sad, angry, surprised, worried, thinking); the robot source has Angry, Surprised and Sad morph targets to bring over
 - [ ] Optional "talking" gesture loop on the Gesture layer while speaking
 - [x] Copy generated audio next to the .blend (`//csk360_audio/`) so projects are portable
 - [!] Test Supertonic 3 voices end to end: blocked until Lojith accepts its OpenRAIL-M terms (Voices panel)
@@ -97,5 +97,6 @@ Companion extension `csk360_agents` (separate add-on that drives CSK360's `comma
 - [x] Clips: loop / once / pose modes, blends, automatic extra tracks for overlaps, `]` / `[` durations
 - [x] Walk to a point or object with stride-matched speed, arrival action
 - [x] Starter 3D toon character (`biped_toon`) with mouth shape keys and starter actions
+- [x] Starter body is now a CC0 humanoid robot (Quaternius RobotExpressive) with a colour per robot
 - [x] Voice service outside Blender: Kokoro + Supertonic 3 + Rhubarb, cached, background generation
 - [x] Headless test suite and build script
